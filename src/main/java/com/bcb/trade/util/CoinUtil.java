@@ -71,6 +71,7 @@ public class CoinUtil {
     }
     public static List<String> getAllFutureCoinsByTypeAndCategory() {
         return getAllFutureCoinsByTypeAndCategory(
+                Coins.FUTURE_USDT_COINS_FAVOURITE,
                 Coins.FUTURE_USDT_COINS_BY_METAVERSE_AND_GAMING_COINS,
                 Coins.FUTURE_USDT_COINS_BY_PRICE_AND_MARKETCAP,
                 Coins.FUTURE_USDT_COINS_BY_TYPE_AND_GROWTH,

@@ -67,6 +67,7 @@ public class FutureOrderScheduler {
             pauseNewOrderFor2Hrs = false;
             pauseTimefor2Hrs = null;
         }else if(pauseNewOrderFor2Hrs){
+            System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
             return;
         }
         Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers();

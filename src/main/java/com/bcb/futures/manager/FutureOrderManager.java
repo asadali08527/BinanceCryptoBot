@@ -11,10 +11,10 @@ import com.bcb.trade.util.CoinUtil;
 
 class FutureOrderManager {
 	
-	private static final String REDUCING_PRECISION_MESSAGE = "Position created by reducing precision for coin ";
-	private static final String DOUBLING_QUANTITY_MESSAGE = "Position Retrying by doubling quantity for coin ";
-	private static final String INCREASING_QUANTITY_MESSAGE = "Position Retrying by increasing quantity for coin ";
-	private static final String PAUSING_ORDER_MESSAGE = "ReduceOnly Order is getting rejected: Pausing new orders";
+	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
+	private static final String DOUBLING_QUANTITY_MESSAGE = "Position Retried by doubling quantity for coin ";
+	private static final String INCREASING_QUANTITY_MESSAGE = "Position Retried by increasing quantity for coin ";
+	private static final String PAUSING_ORDER_MESSAGE = "ReduceOnly Order is getting rejected: Pausing new orders ";
 	
 	private static FutureOrderManager instance;
 

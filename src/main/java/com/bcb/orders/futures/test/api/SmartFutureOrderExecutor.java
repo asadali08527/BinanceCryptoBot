@@ -39,11 +39,12 @@ public class SmartFutureOrderExecutor {
     static Map<String, TickerInfo> tickerMap = null;
     private static List<String> errored = new ArrayList<>();
     private static List<String> processed = new ArrayList<>();
-
+    static List<String> symbols = CoinUtil.getAllFutureCoinsByTypeAndCategory();
     static SpotClient client = new SpotClientImpl(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY);
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
+    private static boolean keepeitherOpenOrderOrPosition = true;
     private static boolean pauseNewOrder = false;
+    private static boolean openOrderExist = false;
 
     public static void main(String[] args) {
         scheduler.scheduleAtFixedRate(SmartFutureOrderExecutor::executeCronJob, 0, 5, TimeUnit.MINUTES);
@@ -55,15 +56,19 @@ public class SmartFutureOrderExecutor {
 
     public static void executeCronJob() {
         pauseNewOrder = false;
+        processed.clear();
+        errored.clear();
         tickerMap = MarketSentimentAnalyzer.getTickers();
         Map<String, Object> parameters = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
-        List<String> symbols = CoinUtil.getAllFutureCoinsByTypeAndCategory();
         Date startTime = new Date();
         System.out.println("*******************************************************************************************************************************************");
         System.out.println("Cron started at " + startTime);
         symbols.forEach(coin -> {
-            if(!pauseNewOrder && !openOrderExist(coin)) {
+            openOrderExist= openOrderExist(coin);
+            if(keepeitherOpenOrderOrPosition)
+                if(openOrderExist)
+                    return;
                 parameters.put("symbol", coin);
                 try {
                     processCronJobForSymbol(parameters, coin);
@@ -83,7 +88,6 @@ public class SmartFutureOrderExecutor {
                 } finally {
                     parameters.clear();
                 }
-            }
         });
         printResult(symbols, errors, startTime,errored);
 
@@ -114,13 +118,13 @@ public class SmartFutureOrderExecutor {
         parameters = updateParameters(parameters, coin);
         if(parameters == null)
             return;
-        if (positionInfo.getPositionAmount() == 0.0) {
+        if (positionInfo.getPositionAmount() == 0.0 && !openOrderExist && !pauseNewOrder) {
             System.out.println("Creating Order for : "+parameters);
             createFuturePosition(parameters, 0);
         } else if (positionInfo.getPositionAmount() < 0.0) {
             System.out.println("Handling Existing Sell Order : "+positionInfo);
             handleNegativePosition(parameters, coin, positionInfo, client);
-        } else {
+        } else if(positionInfo.getPositionAmount() > 0.0){
             System.out.println("Handling Existing Buy Order : "+positionInfo);
             handlePositivePosition(parameters, coin, positionInfo, client);
         }
@@ -200,11 +204,13 @@ public class SmartFutureOrderExecutor {
         Double unRealizedProfit = positionInfo.getUnRealizedProfit();
 
         if (unRealizedProfit >= 0.0) {
-            if (isPositionAmountLT75Cent(coin, positionInfo)) {
+            if (!pauseNewOrder && isPositionAmountLT75Cent(coin, positionInfo)) {
                 increasePositionAmount(parameters, Coins.SELL_SIDE, client);
                 System.out.println("Position Increased for " + parameters);
-            }else  if (unRealizedProfit >= 1.0) {
+            }else  if (unRealizedProfit >= 1.0 && !pauseNewOrder) {
                 closeAndCreatePosition(coin, positionInfo, client, parameters);
+            }else if(unRealizedProfit >= 1.0) {
+                closeFuturePosition(coin,positionInfo,client);
             }
         } else if (unRealizedProfit < 0) {
             handleNegativeUnrealizedProfitForSellOrder(parameters, coin, positionInfo, client);
@@ -229,10 +235,13 @@ public class SmartFutureOrderExecutor {
 
         Double unRealizedProfit = positionInfo.getUnRealizedProfit();
 
-        if (unRealizedProfit >= 1.0) {
+        if (unRealizedProfit >= 1.0 && !pauseNewOrder) {
             //closeFuturePosition(coin, positionInfo, client);
             closeAndCreatePosition(coin, positionInfo, client, parameters);
-        } else if (unRealizedProfit >= 0.0 && isPositionAmountLT75Cent(coin, positionInfo)) {
+        }if (unRealizedProfit >= 1.0 ) {
+            closeFuturePosition(coin, positionInfo, client);
+            //closeAndCreatePosition(coin, positionInfo, client, parameters);
+        } else if (!pauseNewOrder && isPositionAmountLT75Cent(coin, positionInfo)) {
             increasePositionAmount(parameters, Coins.BUY_SIDE, client);
             System.out.println("Position Increased for " + parameters);
         }else if (unRealizedProfit < 0) {
@@ -244,7 +253,7 @@ public class SmartFutureOrderExecutor {
                                                        PositionInfo positionInfo, SpotClient client)
             throws BinanceConnectorException, BinanceClientException {
 
-        if (isPositionAmountLT75Cent(coin, positionInfo)) {
+        if (!pauseNewOrder && isPositionAmountLT75Cent(coin, positionInfo)) {
             increasePositionAmount(parameters, Coins.BUY_SIDE, client);
             System.out.println("Position Increased for " + parameters);
         } else if (getPercentageGap(positionInfo.getLiquidationPrice(), positionInfo.getMarkPrice())
@@ -316,7 +325,7 @@ public class SmartFutureOrderExecutor {
     private static boolean isPositionAmountLT75Cent(String coin, PositionInfo positionInfo) {
         double positionAmount = Math.abs(positionInfo.getPositionAmount()) * positionInfo.getEntryPrice()
                 / positionInfo.getLeverage();
-        return positionAmount <= 0.75;
+        return positionAmount <= 1.0;
     }
 
     private static void increasePositionAmount(Map<String, Object> parameters, String side, SpotClient client)
