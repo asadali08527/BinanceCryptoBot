@@ -1,4 +1,4 @@
-package com.bcb.manager;
+package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
@@ -58,10 +58,10 @@ public class PositionManager {
         Double unRealizedProfit = positionInfo.getUnRealizedProfit();
 
         if (unRealizedProfit >= 0.0) {
-            if (isPositionAmountLT75Cent(coin, positionInfo)) {
+            if (isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
                 increasePositionAmount(parameters, Coins.SELL_SIDE);
                 System.out.println(POSITION_INCREASED_MESSAGE + parameters);
-            } else if (unRealizedProfit >= 1.0) {
+            } else if (unRealizedProfit >= 1.0 && parameters != null) {
                 closeAndCreatePosition(coin, positionInfo, parameters);
             }
         } else if (unRealizedProfit < 0) {
@@ -75,11 +75,11 @@ public class PositionManager {
 
         if (unRealizedProfit >= 1.0 && parameters != null) {
             closeAndCreatePosition(coin, positionInfo, parameters);
-        } else if (unRealizedProfit >= 0.0 && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
-            increasePositionAmount(parameters, Coins.BUY_SIDE);
-            System.out.println(POSITION_INCREASED_MESSAGE + parameters);
         } else if (unRealizedProfit >= 1.0) {
             closeFuturePosition(coin, positionInfo);
+        } else if (!FutureOrderScheduler.pauseNewOrderFor2Hrs && unRealizedProfit >= 0.0 && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
+            increasePositionAmount(parameters, Coins.BUY_SIDE);
+            System.out.println(POSITION_INCREASED_MESSAGE + parameters);
         } else if (unRealizedProfit < 0) {
             handleNegativeUnrealizedProfitForBuyOrder(parameters, coin, positionInfo);
         }
@@ -112,7 +112,7 @@ public class PositionManager {
 
     private void handleNegativeUnrealizedProfitForBuyOrder(Map<String, Object> parameters, String coin,
                                                            PositionInfo positionInfo) throws BinanceConnectorException, BinanceClientException {
-        if (isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
+        if (!FutureOrderScheduler.pauseNewOrderFor2Hrs && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
             increasePositionAmount(parameters, Coins.BUY_SIDE);
             System.out.println("Position Increased for " + parameters);
         } else if (CoinUtil.getPercentageGap(positionInfo.getLiquidationPrice(), positionInfo.getMarkPrice())

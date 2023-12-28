@@ -1,4 +1,4 @@
-package com.bcb.orders;
+package com.bcb.orders.futures.test.api;
 
 import com.bcb.trade.constants.Coins;
 import com.bcb.trade.sentiment.MarketSentimentAnalyzer;

@@ -1,5 +1,6 @@
-package com.bcb.manager;
+package com.bcb.futures.manager;
 
+import java.util.Date;
 import java.util.Map;
 
 import com.bcb.client.SpotClient;
@@ -62,12 +63,14 @@ class FutureOrderManager {
             retryAndLog(parameters, retry, INCREASING_QUANTITY_MESSAGE);
         } else if (Coins.ERROR_CODE_4400.equalsIgnoreCase(errorCode) && retry <= 1) {
             System.out.println("Skipping due to error: Futures Trading Quantitative Rules violated, only reduceOnly order is allowed, please try again later. " + parameters);
+            FutureOrderScheduler.pauseNewOrderFor2Hrs = true;
+            FutureOrderScheduler.pauseTimefor2Hrs = new Date();
         } else if (Coins.ERROR_CODE_1121.equalsIgnoreCase(errorCode)) {
         	printErrorMessage(e.getMessage(),parameters);
             handleInvalidSymbol(parameters);
         } else if (Coins.ERROR_CODE_2022.equalsIgnoreCase(errorCode)) {
             System.out.println(PAUSING_ORDER_MESSAGE);
-            FutureOrderScheduler.pauseNewOrder = true;
+            FutureOrderScheduler.pauseNewOrderFor2Hrs = true;
             printErrorMessage(e.getMessage(),parameters);
         } else if (Coins.ERROR_CODE_4141.equalsIgnoreCase(errorCode)) {
             //System.out.println("Symbol is closed. " + parameters);

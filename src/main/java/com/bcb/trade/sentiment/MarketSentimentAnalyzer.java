@@ -1,22 +1,31 @@
 package com.bcb.trade.sentiment;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.bcb.client.SpotClient;
 import com.bcb.config.PrivateConfig;
 import com.bcb.enums.MarketType;
 import com.bcb.enums.TimeInterval;
 import com.bcb.impl.SpotClientImpl;
 import com.bcb.impl.spot.Market;
-import com.bcb.orders.HistoricalDataFetcher;
+import com.bcb.orders.futures.test.api.HistoricalDataFetcher;
+import com.bcb.trade.constants.Coins;
 import com.bcb.transfer.Sentiment;
 import com.bcb.transfer.TickerInfo;
-import com.bcb.trade.constants.Coins;
-import com.bcb.trade.util.*;
 import com.google.gson.Gson;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
 public class MarketSentimentAnalyzer {
+	
+	static boolean applyAveragePrice = false;
+
+    static boolean applyPartialAveragePrice = true;
 
     static SpotClient client = new SpotClientImpl(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY);
 
@@ -70,9 +79,15 @@ public class MarketSentimentAnalyzer {
             sentiment.setSide(Coins.HOLD_SIDE);
         }
         if(MarketType.LIMIT==type ){
-            if(Coins.BUY_SIDE.equalsIgnoreCase(sentiment.getSide()))
-                sentiment.setPrice(String.valueOf(tickerInfo.getLowPrice()));
-            else
+            double averagePrice = (tickerInfo.getLowPrice() + tickerInfo.getHighPrice()) / 2.0;
+            if(Coins.BUY_SIDE.equalsIgnoreCase(sentiment.getSide())) {
+                if(applyAveragePrice && averagePrice < tickerInfo.getLastPrice())
+                    sentiment.setPrice(String.valueOf(averagePrice));
+                else if(applyPartialAveragePrice && Math.random() < 0.25 && averagePrice < tickerInfo.getLastPrice())
+                    sentiment.setPrice(String.valueOf(averagePrice));
+                else
+                    sentiment.setPrice(String.valueOf(tickerInfo.getLowPrice()));
+            } else
                 sentiment.setPrice(String.valueOf(tickerInfo.getLastPrice()));
         }else{
             sentiment.setPrice(String.valueOf(tickerInfo.getLastPrice()));

@@ -1,4 +1,4 @@
-package com.bcb.manager;
+package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -34,7 +34,12 @@ public class FutureOrderScheduler {
     static List<String> invalidSymbol = new ArrayList<>();
     static List<String> processed = new ArrayList<>();
     static List<String> symbols = null;
-    static boolean pauseNewOrder = false;
+    static boolean pauseNewOrderFor2Hrs = false;
+	public static Date pauseTimefor2Hrs = null;
+    private static boolean keepEitherOpenOrderOrOpenPosition = false;
+    private static boolean openOrderExist = false;
+
+
 
     private final PositionManager positionManager;
     private final FutureOrderManager futureOrderManager;
@@ -55,6 +60,15 @@ public class FutureOrderScheduler {
     }
 
     public void takePositions() {
+    	processed.clear();
+    	errored.clear();
+    	invalidSymbol.clear();
+    	if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
+            pauseNewOrderFor2Hrs = false;
+            pauseTimefor2Hrs = null;
+        }else if(pauseNewOrderFor2Hrs){
+            return;
+        }
         Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers();
         Map<String, Object> parameters = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
@@ -62,14 +76,13 @@ public class FutureOrderScheduler {
         System.out.println("**************************************************************************************************************************************************");
         System.out.println("Cron started at " + startTime);
         Iterator<String> iterator = symbols.iterator();
-        pauseNewOrder = false;
+        pauseNewOrderFor2Hrs = false;
         while (iterator.hasNext()) {
-            if (pauseNewOrder) {
-                printResult(symbols, errors, errored, startTime);
-                return;
-            }
             String coin = iterator.next();
-            if (!positionManager.openOrderExist(coin)) {
+            openOrderExist= positionManager.openOrderExist(coin);
+        	if(keepEitherOpenOrderOrOpenPosition)
+        		if(openOrderExist)
+        			continue;
                 parameters.put("symbol", coin);
                 try {
                     takePositionForCoin(parameters, coin, tickerMap);
@@ -81,7 +94,7 @@ public class FutureOrderScheduler {
                     parameters.clear();
                 }
             }
-        }
+        
         printResult(symbols, errors, errored, startTime);
     }
 
@@ -90,8 +103,8 @@ public class FutureOrderScheduler {
         Date finishedTime = new Date();
         System.out.println(CRON_FINISHED_MESSAGE + finishedTime);
         System.out.println(TOTAL_TIME_MESSAGE + (finishedTime.getTime() - startTime.getTime()) / (60.0 * 1000.0) + " minutes" + " \nProcessed Coins : " + processed);
+        System.out.println("Errors: " + errors + "\nCoin didn't get processed : " + errored);
         System.out.println("**************************************************************************************************************************************************");
-        System.out.println("Errors: " + errors + " | \nCoin didn't get processed : " + errored);
     }
 
     private void takePositionForCoin(Map<String, Object> parameters, String coin, Map<String, TickerInfo> tickerInfoMap)
@@ -108,13 +121,13 @@ public class FutureOrderScheduler {
             return;
         }
         System.out.println("Current Position Info: " + positionInfo);
-        if (positionInfo.getPositionAmount() == 0.0 && !pauseNewOrder) {
+        if (positionInfo.getPositionAmount() == 0.0 && !pauseNewOrderFor2Hrs && !openOrderExist) {
             System.out.println("Creating Order for : " + parameters);
             futureOrderManager.createFuturePosition(parameters, 0);
         } else if (positionInfo.getPositionAmount() < 0.0) {
             System.out.println("Handling Existing Sell Order : " + positionInfo);
             positionManager.handleNegativePosition(parameters, coin, positionInfo);
-        } else {
+        } else if (positionInfo.getPositionAmount()> 0.0){
             System.out.println("Handling Existing Buy Order : " + positionInfo);
             positionManager.handlePositivePosition(parameters, coin, positionInfo);
         }

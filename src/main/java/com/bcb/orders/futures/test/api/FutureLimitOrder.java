@@ -1,4 +1,4 @@
-package com.bcb.orders;
+package com.bcb.orders.futures.test.api;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;

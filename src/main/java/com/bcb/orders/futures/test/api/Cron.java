@@ -1,4 +1,4 @@
-package com.bcb.orders;
+package com.bcb.orders.futures.test.api;
 
 import com.bcb.client.SpotClient;
 import com.bcb.config.PrivateConfig;

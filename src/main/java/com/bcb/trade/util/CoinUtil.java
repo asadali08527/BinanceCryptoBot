@@ -8,7 +8,10 @@ import com.bcb.transfer.Sentiment;
 import com.bcb.transfer.TickerInfo;
 
 import java.text.DecimalFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -99,5 +102,24 @@ public class CoinUtil {
         //params.put("timestamp", System.currentTimeMillis());
         System.out.println("Parameters: " + params);
         return params;
+    }
+	public static boolean checkIfCoolingPeriodPassed(Date pauseTimefor2Hrs) {
+        if(pauseTimefor2Hrs == null)
+            return true;
+        // Convert Date to LocalDateTime
+        LocalDateTime inputDateTime = pauseTimefor2Hrs.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+
+        // Add 2 hours to the input date time
+        LocalDateTime datePlus2Hours = inputDateTime.plusHours(2);
+
+        // Get the current date and time
+        LocalDateTime currentDateTime = LocalDateTime.now();
+
+        // Check if datePlus2Hours is after the current date and time
+        if (datePlus2Hours.isAfter(currentDateTime)) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }
