@@ -94,6 +94,11 @@ public class PositionManager {
     private void increasePositionAmount(Map<String, Object> parameters, String side)
             throws BinanceConnectorException, BinanceClientException {
         parameters.put("side", side);
+        parameters.put("type","MARKET");
+        parameters.remove("price");
+        parameters.remove("timeInForce");
+        parameters.remove("closePosition");
+        parameters.remove("newOrderRespType");
         FutureOrderManager.getInstance(this.client).createFuturePosition(parameters, 0);
     }
 
