@@ -21,17 +21,17 @@ Implements robust error-handling mechanisms to ensure the reliability and stabil
 ##### Rate Limit Management: 
 Handles Binance API rate limits to prevent exceeding the allowed request frequency.
 ## How to Use
-- 1. Clone the Repository:
+1. Clone the Repository:
 ```
 git clone [BinanceCryptoBot](https://github.com/asadali08527/BinanceCryptoBot)
 cd BinanceCryptoBot
 ```
-- 2. Configure Binance API Keys:
+2. Configure Binance API Keys:
 
 + Obtain Binance API key and secret from the Binance platform.
 + Update PrivateConfig.java with your API key and secret.
 
-- 3. Run the Trading Bot:
+3. Run the Trading Bot:
 
 + Execute the FutureOrderScheduler class to start the automated trading bot.
 ```
@@ -42,8 +42,8 @@ java FutureOrderScheduler
 
 Adjust the trading strategies, sentiment analysis parameters, and risk management settings in the source code based on your preferences.
 #### Dependencies
-Java
-Binance Java Connector
-Gson Library
+Java,
+Binance Java Connector,
+Gson Library, etc
 ### Contribution
 Contributions are welcome! If you encounter issues or have suggestions for improvements, please open an issue or submit a pull request.
