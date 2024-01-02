@@ -25,13 +25,15 @@ public class MarketSentimentAnalyzer {
 	
 	static boolean applyAveragePrice = false;
 
-    static boolean applyPartialAveragePrice = true;
+    static boolean applyPartialAveragePrice = false;
 
     static SpotClient client = new SpotClientImpl(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY);
 
 
     public static Sentiment getSentiment(String coin, MarketType type, Map<String,TickerInfo> tickerMap) {
         TickerInfo tickerInfo = tickerMap.get(coin);
+        if(tickerInfo==null)
+            return null;
         Map<String, List<TickerInfo>> marketMovement = tickerMap.entrySet().stream()
                 .collect(Collectors.groupingBy(entry ->
                                 entry.getValue().getPriceChangePercent() < 0 && Math.abs(entry.getValue().getPriceChangePercent()) >= Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD ? "DOWN" : "UP",
@@ -47,21 +49,26 @@ public class MarketSentimentAnalyzer {
             sentiment.setType(MarketType.LIMIT.toString());
         else
             sentiment.setType(type.toString());
-
+        sentiment.setSide(Coins.HOLD_SIDE);
         // Smart Entry Strategy
         if (upCount > downCount) {
             if (shortTermMA > longTermMA && (tickerInfo.getPriceChangePercent() > 0 && tickerInfo.getPriceChangePercent() < Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD)) {
                 sentiment.setSide(Coins.BUY_SIDE);
-            } else if (upCount > downCount * 4) {
-                if (shortTermMA < longTermMA && tickerInfo.getPriceChangePercent() > 0) {
+            } else if (upCount > downCount * 2) {
+                if (shortTermMA < longTermMA && tickerInfo.getPriceChangePercent() < 0) {
                     sentiment.setSide(Coins.BUY_SIDE);
-                } else if (tickerInfo.getPriceChangePercent() > 0) {
+                } else if (shortTermMA < longTermMA  && tickerInfo.getPriceChangePercent() > 0) {
                     sentiment.setSide(Coins.BUY_SIDE);
                 } else if(upCount > downCount * 10){
                     sentiment.setSide(Coins.BUY_SIDE);
+                }else{
+                    sentiment.setSide(Coins.BUY_SIDE);
                 }
             } else {
-                sentiment.setSide(Coins.HOLD_SIDE);
+                if(tickerInfo.getPriceChangePercent()>0 && shortTermMA >longTermMA)
+                    sentiment.setSide(Coins.BUY_SIDE);
+                else if(tickerInfo.getPriceChangePercent()<0 && shortTermMA <longTermMA)
+                    sentiment.setSide(Coins.HOLD_SIDE);
             }
         } else if (upCount < downCount) {
             if (shortTermMA < longTermMA) {
@@ -88,7 +95,7 @@ public class MarketSentimentAnalyzer {
                 else
                     sentiment.setPrice(String.valueOf(tickerInfo.getLowPrice()));
             } else
-                sentiment.setPrice(String.valueOf(tickerInfo.getLastPrice()));
+                sentiment.setPrice(String.valueOf(tickerInfo.getHighPrice()));
         }else{
             sentiment.setPrice(String.valueOf(tickerInfo.getLastPrice()));
         }

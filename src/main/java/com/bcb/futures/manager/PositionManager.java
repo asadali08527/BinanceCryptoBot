@@ -15,7 +15,7 @@ import com.bcb.transfer.PositionInfo;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-public class PositionManager {
+public class PositionManager extends ExceptionManager {
 	
 	private static final String POSITION_INCREASED_MESSAGE = "Position Increased for ";
 
@@ -141,5 +141,25 @@ public class PositionManager {
         parameters.put("quantity", String.valueOf(Math.abs(positionInfo.getPositionAmount())));
         FutureOrderManager.getInstance(client).createFuturePosition(parameters,0);
     }
+
+	public List<PositionInfo> getOpenPosition(String coin) {
+	    	Map<String, Object> parameters = new HashMap<>();
+	        try {
+	            parameters.put("symbol", coin);
+	            String result = getFuturesOpenPosition(parameters);
+	            Gson gson = new Gson();
+	            Type orderListType = new TypeToken<List<PositionInfo>>() {
+	            }.getType();
+	            return gson.fromJson(result, orderListType);
+	        }catch (BinanceConnectorException e) {
+	            handleConnectorException(e);
+	        } catch (BinanceClientException e) {
+	            handleClientException(parameters, e, 0);
+	        } catch (Exception e) {
+	            handleGenericException(parameters, e);
+	        }
+	        return null;
+		}
+	
 
 }

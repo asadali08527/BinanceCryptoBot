@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -50,11 +51,9 @@ public class CoinUtil {
         String quantity = qty.contains(".")?qty.substring(0, qty.length() - 1):String.valueOf(Double.valueOf(qty)*2);
         return nonZeroQuantity(quantity);
     }
-    public static void handleException(List<String> errors, String coin, Map<String, Object> parameters,
-                                       Exception exception) {
+    public static void handleException(List<String> errors, String coin, Exception exception) {
         System.err.println((String) String.format("fullErrMessage: %s", exception.getMessage()));
         errors.add(coin + " : FullErrMsg : " + exception.getMessage());
-        parameters.clear();
     }
 
     public static String increaseByPoint1(String quantity) {
@@ -88,10 +87,12 @@ public class CoinUtil {
     public static double getPercentageGap(Double price1, Double price2) {
         return 100 - (price1 * 100 / price2);
     }
-	public static Map<String, Object> updateParameters(Map<String, Object> params, String coin, Map<String, TickerInfo> tickerMap) {
+	public static Map<String, Object> updateParameters(String coin, Map<String, TickerInfo> tickerMap) {
+        Map<String, Object> params = new HashMap<>();
         Sentiment sentiment = MarketSentimentAnalyzer.getSentiment(coin, MarketType.LIMIT, tickerMap);
-        if(sentiment!=null && (sentiment.getSide()==null ||Coins.HOLD_SIDE.equalsIgnoreCase(sentiment.getSide())))
+        if (sentiment == null || sentiment.getSide() == null || Coins.HOLD_SIDE.equalsIgnoreCase(sentiment.getSide())) {
             return null;
+        }
         params.put("symbol", sentiment.getSymbol());
         params.put("side", sentiment.getSide());
         params.put("type", sentiment.getType());

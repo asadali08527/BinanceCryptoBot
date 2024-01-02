@@ -82,7 +82,7 @@ public class SmartFutureOrderExecutor {
                         printResult(symbols, errors, startTime,errored);
                         pauseNewOrder = true;
                     }
-                    CoinUtil.handleException(errors, coin, parameters, e);
+                    CoinUtil.handleException(errors, coin, e);
                 } catch (Exception e) {
                     System.out.println("Exception: " + e.getMessage());
                 } finally {

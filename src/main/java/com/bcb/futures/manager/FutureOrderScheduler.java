@@ -71,29 +71,24 @@ public class FutureOrderScheduler {
             return;
         }
         Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers();
-        Map<String, Object> parameters = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
         Date startTime = new Date();
         System.out.println("**************************************************************************************************************************************************");
         System.out.println("Cron started at " + startTime);
         Iterator<String> iterator = symbols.iterator();
-        pauseNewOrderFor2Hrs = false;
-        while (iterator.hasNext()) {
+        while (iterator.hasNext() && !pauseNewOrderFor2Hrs) {
             String coin = iterator.next();
             openOrderExist= positionManager.openOrderExist(coin);
         	if(keepEitherOpenOrderOrOpenPosition)
         		if(openOrderExist)
         			continue;
-                parameters.put("symbol", coin);
                 try {
-                    takePositionForCoin(parameters, coin, tickerMap);
+                    takePositionForCoin( coin, tickerMap);
                 } catch (BinanceConnectorException | BinanceClientException e) {
-                    CoinUtil.handleException(errors, coin, parameters, e);
+                    CoinUtil.handleException(errors, coin, e);
                 } catch (Exception e) {
                     System.out.println("Exception: " + e.getMessage());
-                } finally {
-                    parameters.clear();
-                }
+                } 
             }
         
         printResult(symbols, errors, errored, startTime);
@@ -108,16 +103,13 @@ public class FutureOrderScheduler {
         System.out.println("**************************************************************************************************************************************************");
     }
 
-    private void takePositionForCoin(Map<String, Object> parameters, String coin, Map<String, TickerInfo> tickerInfoMap)
+    private void takePositionForCoin(String coin, Map<String, TickerInfo> tickerInfoMap)
             throws BinanceConnectorException, BinanceClientException {
-
-        String result = positionManager.getFuturesOpenPosition(parameters);
-        Gson gson = new Gson();
-        Type orderListType = new TypeToken<List<PositionInfo>>() {}.getType();
-        List<PositionInfo> positionInfos = gson.fromJson(result, orderListType);
+        List<PositionInfo> positionInfos = positionManager.getOpenPosition(coin);
+        if(positionInfos==null)
+            return;
         PositionInfo positionInfo = positionInfos.get(0);
-        parameters.clear();
-        parameters = CoinUtil.updateParameters(parameters, coin, tickerInfoMap);
+        Map<String, Object> parameters = CoinUtil.updateParameters( coin, tickerInfoMap);
         if (parameters == null) {
             return;
         }
@@ -134,7 +126,8 @@ public class FutureOrderScheduler {
         }
     }
 
-    public static List<String> getAllFutureCoins() {
+    
+	public static List<String> getAllFutureCoins() {
         return CoinUtil.getAllFutureCoinsByTypeAndCategory(Coins.FUTURE_USDT_COINS_IN_ACTION);
     }
 }
