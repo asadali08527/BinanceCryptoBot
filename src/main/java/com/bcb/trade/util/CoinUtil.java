@@ -124,4 +124,7 @@ public class CoinUtil {
             return true;
         }
     }
+	public static List<PositionInfo> getOpenPosition(String coin, List<PositionInfo> openPositions) {
+        return openPositions.stream().filter(f->f.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
+	}
 }

@@ -92,8 +92,13 @@ public class Futures {
     }
 
     private final String FUTURE_OPEN_POSITION = "/fapi/v2/positionRisk";
+    
     public String getFuturesOpenPosition(Map<String, Object> parameters) {
         ParameterChecker.checkParameter(parameters, "symbol", String.class);
+        return requestHandler.sendSignedRequest(baseUrl, FUTURE_OPEN_POSITION, parameters, HttpMethod.GET, showLimitUsage);
+    }
+    
+    public String getAllFuturesOpenPosition(Map<String, Object> parameters) {
         return requestHandler.sendSignedRequest(baseUrl, FUTURE_OPEN_POSITION, parameters, HttpMethod.GET, showLimitUsage);
     }
 

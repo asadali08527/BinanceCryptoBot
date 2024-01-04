@@ -1,6 +1,8 @@
 package com.bcb.futures.manager;
 
-import java.util.Date;
+import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.bcb.client.SpotClient;
@@ -8,6 +10,9 @@ import com.bcb.exceptions.BinanceClientException;
 import com.bcb.exceptions.BinanceConnectorException;
 import com.bcb.trade.constants.Coins;
 import com.bcb.trade.util.CoinUtil;
+import com.bcb.transfer.OpenOrderInfo;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 class FutureOrderManager extends ExceptionManager{
 	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
@@ -69,5 +74,14 @@ class FutureOrderManager extends ExceptionManager{
 			return ""; 
 		}
 	}
+
+	public List<OpenOrderInfo> getOpenOrders() {
+        Gson gson = new Gson();
+        Map<String,Object> parameters = new LinkedHashMap<>();
+        String result = client.createFutures().getFuturesOpenOrders(parameters);
+        Type orderListType = new TypeToken<List<OpenOrderInfo>>() {}.getType();
+        List<OpenOrderInfo> openOrderInfos = gson.fromJson(result, orderListType);
+        return openOrderInfos;
+    }
 
 }

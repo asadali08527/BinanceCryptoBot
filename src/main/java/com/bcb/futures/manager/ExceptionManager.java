@@ -10,7 +10,8 @@ import com.bcb.trade.util.CoinUtil;
 
 public class ExceptionManager {
 	private static final String PAUSING_ORDER_MESSAGE = "ReduceOnly Order is getting rejected: Pausing new orders ";
-	
+    private static final String INSUFFICIENT_MARGIN_MESSAGE = "Margin is insufficient: Pausing new orders";
+
 	
 	protected void handleConnectorException(BinanceConnectorException e) {
         System.err.println(String.format("fullErrMessage: %s", e.getMessage()));
@@ -33,7 +34,12 @@ public class ExceptionManager {
             System.out.println(PAUSING_ORDER_MESSAGE);
             FutureOrderScheduler.pauseNewOrderFor2Hrs = true;
             printErrorMessage(e.getMessage(),parameters);
-        } else if (Coins.ERROR_CODE_4141.equalsIgnoreCase(errorCode)) {
+        } else if (Coins.ERROR_CODE_2019.equalsIgnoreCase(errorCode)) {
+            System.out.println(INSUFFICIENT_MARGIN_MESSAGE);
+            FutureOrderScheduler.pauseCreateOrders = true;
+            //FutureOrderScheduler.pauseTimefor2Hrs = new Date();
+            printErrorMessage(e.getMessage(),parameters);
+        }else if (Coins.ERROR_CODE_4141.equalsIgnoreCase(errorCode)) {
             //System.out.println("Symbol is closed. " + parameters);
         	printErrorMessage(e.getMessage(),parameters);
         } else if (Coins.ERROR_CODE_1102.equalsIgnoreCase(errorCode) || Coins.ERROR_CODE_4014.equalsIgnoreCase(errorCode)) {

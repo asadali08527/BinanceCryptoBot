@@ -13,6 +13,7 @@ import com.bcb.client.SpotClient;
 import com.bcb.config.PrivateConfig;
 import com.bcb.enums.MarketType;
 import com.bcb.enums.TimeInterval;
+import com.bcb.exceptions.BinanceClientException;
 import com.bcb.impl.SpotClientImpl;
 import com.bcb.impl.spot.Market;
 import com.bcb.orders.futures.test.api.HistoricalDataFetcher;
@@ -138,10 +139,10 @@ public class MarketSentimentAnalyzer {
         return gson.fromJson(result, TickerInfo.class);
     }
 
-    public static Map<String,TickerInfo> getTickers() {
+    public static Map<String,TickerInfo> getTickers(String... coins) {
         Map<String, Object> parameters = new LinkedHashMap<>();
         Market market = client.createMarket();
-        String[] allFutureCoins = Coins.FUTURE_USDT_COINS_IN_ACTION;
+        String[] allFutureCoins = (coins==null||coins.length==0)?Coins.FUTURE_USDT_COINS_IN_ACTION:coins;
         int batchSize = 99;
         Map<String,TickerInfo> tickerInfoMap = new HashMap<>();
 
@@ -157,7 +158,16 @@ public class MarketSentimentAnalyzer {
             parameters.put("symbols", symbols);
 
             // Fetch ticker info for the current batch
-            String result = market.ticker(parameters);
+            String result =null;
+            try {
+                 result = market.ticker(parameters);
+            }catch (BinanceClientException e){
+                e.printStackTrace();
+                if(e.getErrorCode()==-1121){
+                    System.out.println(e.getMessage());
+                }
+                continue;
+            }            
             //System.out.println(result);
 
             // Parse JSON into TickerInfo array

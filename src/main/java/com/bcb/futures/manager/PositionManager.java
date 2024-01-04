@@ -2,6 +2,7 @@ package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -77,7 +78,7 @@ public class PositionManager extends ExceptionManager {
             closeAndCreatePosition(coin, positionInfo, parameters);
         } else if (unRealizedProfit >= 1.0) {
             closeFuturePosition(coin, positionInfo);
-        } else if (!FutureOrderScheduler.pauseNewOrderFor2Hrs && unRealizedProfit >= 0.0 && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
+        } else if (!FutureOrderScheduler.pauseCreateOrders && unRealizedProfit >= 0.0 && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
             increasePositionAmount(parameters, Coins.BUY_SIDE);
             System.out.println(POSITION_INCREASED_MESSAGE + parameters);
         } else if (unRealizedProfit < 0) {
@@ -117,7 +118,7 @@ public class PositionManager extends ExceptionManager {
 
     private void handleNegativeUnrealizedProfitForBuyOrder(Map<String, Object> parameters, String coin,
                                                            PositionInfo positionInfo) throws BinanceConnectorException, BinanceClientException {
-        if (!FutureOrderScheduler.pauseNewOrderFor2Hrs && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
+        if (!FutureOrderScheduler.pauseCreateOrders && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
             increasePositionAmount(parameters, Coins.BUY_SIDE);
             System.out.println("Position Increased for " + parameters);
         } else if (CoinUtil.getPercentageGap(positionInfo.getLiquidationPrice(), positionInfo.getMarkPrice())
@@ -160,6 +161,25 @@ public class PositionManager extends ExceptionManager {
 	        }
 	        return null;
 		}
+
+	public List<PositionInfo> getAllOpenPositions() {
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        try {
+            String result = client.createFutures().getAllFuturesOpenPosition(parameters);
+            //System.out.println(result);
+            Gson gson = new Gson();
+            Type orderListType = new TypeToken<List<PositionInfo>>() {
+            }.getType();
+            return gson.fromJson(result, orderListType);
+        }catch (BinanceConnectorException e) {
+            handleConnectorException(e);
+        } catch (BinanceClientException e) {
+            handleClientException(parameters, e, 0);
+        } catch (Exception e) {
+            handleGenericException(parameters, e);
+        }
+        return null;
+    }
 	
 
 }

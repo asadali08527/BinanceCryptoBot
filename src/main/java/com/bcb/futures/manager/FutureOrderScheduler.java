@@ -2,6 +2,8 @@ package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -10,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.bcb.client.SpotClient;
 import com.bcb.config.PrivateConfig;
@@ -19,6 +22,7 @@ import com.bcb.impl.SpotClientImpl;
 import com.bcb.trade.constants.Coins;
 import com.bcb.trade.sentiment.MarketSentimentAnalyzer;
 import com.bcb.trade.util.CoinUtil;
+import com.bcb.transfer.OpenOrderInfo;
 import com.bcb.transfer.PositionInfo;
 import com.bcb.transfer.TickerInfo;
 import com.google.gson.Gson;
@@ -38,7 +42,9 @@ public class FutureOrderScheduler {
 	public static Date pauseTimefor2Hrs = null;
     private static boolean keepEitherOpenOrderOrOpenPosition = false;
     private static boolean openOrderExist = false;
-
+	public static boolean pauseCreateOrders = false;
+    private static List<PositionInfo> openPositions = new ArrayList<>();
+    private static List<OpenOrderInfo> openOrders = new ArrayList<>();
 
 
     private final PositionManager positionManager;
@@ -60,17 +66,30 @@ public class FutureOrderScheduler {
     }
 
     public void takePositions() {
-    	processed.clear();
-    	errored.clear();
-    	invalidSymbol.clear();
-    	if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
-            pauseNewOrderFor2Hrs = false;
-            pauseTimefor2Hrs = null;
-        }else if(pauseNewOrderFor2Hrs){
-            System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
-            return;
-        }
-        Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers();
+    	 openOrderExist = false;
+         processed.clear();
+         errored.clear();
+         openOrders.clear();
+         openPositions.clear();
+         if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
+             System.out.println("Cooling period passed, resuming order execution...");
+             pauseNewOrderFor2Hrs = false;
+             pauseTimefor2Hrs = null;
+         }else if(pauseNewOrderFor2Hrs){
+             System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
+             return;
+         }
+         openOrders = futureOrderManager.getOpenOrders();
+         List<PositionInfo> openPositionList = positionManager.getAllOpenPositions();
+         openPositions = openPositionList.stream().filter(f->f.getPositionAmount()!=0.0).collect(Collectors.toList());
+         symbols = openPositionList.stream().map(m->m.getSymbol()).collect(Collectors.toList());
+         Integer aggLeverage = openPositionList.stream().map(m->m.getLeverage()).mapToInt(Integer::valueOf)
+                 .sum()/symbols.size();
+         System.out.println(aggLeverage);
+         symbols.removeAll(Arrays.asList(Coins.FUTURE_INVALID_SYMBOLS_FOR_TICKERS));
+         Collections.shuffle(symbols);
+         Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers(symbols.toArray(new String[0]));
+         
         List<String> errors = new ArrayList<>();
         Date startTime = new Date();
         System.out.println("**************************************************************************************************************************************************");
@@ -105,18 +124,20 @@ public class FutureOrderScheduler {
 
     private void takePositionForCoin(String coin, Map<String, TickerInfo> tickerInfoMap)
             throws BinanceConnectorException, BinanceClientException {
-        List<PositionInfo> positionInfos = positionManager.getOpenPosition(coin);
-        if(positionInfos==null)
-            return;
-        PositionInfo positionInfo = positionInfos.get(0);
+        List<PositionInfo> positionInfos = CoinUtil.getOpenPosition(coin,openPositions);
+        PositionInfo positionInfo = positionInfos.isEmpty()?null:positionInfos.get(0);
         Map<String, Object> parameters = CoinUtil.updateParameters( coin, tickerInfoMap);
         if (parameters == null) {
             return;
         }
         System.out.println("Current Position Info: " + positionInfo);
-        if (positionInfo.getPositionAmount() == 0.0 && !pauseNewOrderFor2Hrs && !openOrderExist) {
-            System.out.println("Creating Order for : " + parameters);
-            futureOrderManager.createFuturePosition(parameters, 0);
+        if (positionInfo==null ) {
+        	if((openOrders.size() <= Coins.OPEN_ORDER_THRESHOLD || openPositions.size() <= Coins.OPEN_POSITION_THRESHOLD) && !openOrderExist) {
+        		if(!pauseCreateOrders) {
+        			System.out.println("Creating Order for : " + parameters);
+        			futureOrderManager.createFuturePosition(parameters, 0);
+        		}
+        	}
         } else if (positionInfo.getPositionAmount() < 0.0) {
             System.out.println("Handling Existing Sell Order : " + positionInfo);
             positionManager.handleNegativePosition(parameters, coin, positionInfo);
