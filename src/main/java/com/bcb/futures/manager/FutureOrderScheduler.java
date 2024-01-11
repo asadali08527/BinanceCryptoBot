@@ -1,14 +1,14 @@
 package com.bcb.futures.manager;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,132 +25,155 @@ import com.bcb.trade.util.CoinUtil;
 import com.bcb.transfer.OpenOrderInfo;
 import com.bcb.transfer.PositionInfo;
 import com.bcb.transfer.TickerInfo;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
 
 public class FutureOrderScheduler {
-    private static final int EXECUTION_INTERVAL_MINUTES = 5;
-    private static final String CRON_FINISHED_MESSAGE = "Cron Finished at ";
-    private static final String TOTAL_TIME_MESSAGE = "Total Time taken to Execute The Job : ";
+	private static final int EXECUTION_INTERVAL_MINUTES = 5;
+	private static final String CRON_FINISHED_MESSAGE = "Cron Finished at ";
+	private static final String TOTAL_TIME_MESSAGE = "Total Time taken to Execute The Job : ";
 
-    static List<String> errored = new ArrayList<>();
-    static List<String> invalidSymbol = new ArrayList<>();
-    static List<String> processed = new ArrayList<>();
-    static List<String> symbols = null;
-    static boolean pauseNewOrderFor2Hrs = false;
+	static List<String> errored = new ArrayList<>();
+	static List<String> invalidSymbol = new ArrayList<>();
+	static List<String> processed = new ArrayList<>();
+	static boolean pauseNewOrderFor2Hrs = false;
 	public static Date pauseTimefor2Hrs = null;
-    private static boolean keepEitherOpenOrderOrOpenPosition = false;
-    private static boolean openOrderExist = false;
+	private static boolean keepEitherOpenOrderOrOpenPosition = false;
+	private static boolean openOrderExist = false;
 	public static boolean pauseCreateOrders = false;
-    private static List<PositionInfo> openPositions = new ArrayList<>();
-    private static List<OpenOrderInfo> openOrders = new ArrayList<>();
+	private static List<PositionInfo> openPositions = new ArrayList<>();
+	public static List<OpenOrderInfo> openOrders = new ArrayList<>();
+	public static Map<String, TickerInfo> tickerMap = new HashMap<>();
+	private Integer upMovement = null;
+	private Integer downMovement = null;
+
+	private final PositionManager positionManager;
+	private final FutureOrderManager futureOrderManager;
+	private List<String> symbols = null;
 
 
-    private final PositionManager positionManager;
-    private final FutureOrderManager futureOrderManager;
+	private SpotClient createSpotClient() {
+		return new SpotClientImpl(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY, PrivateConfig.BASE_URLS[0]);
+	}
 
-    private SpotClient createSpotClient() {
-        return new SpotClientImpl(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY, PrivateConfig.BASE_URLS[0]);
-    }
-    public FutureOrderScheduler() {
-        FutureOrderScheduler.symbols = CoinUtil.getAllFutureCoinsByTypeAndCategory();
-        this.positionManager = new PositionManager(createSpotClient());
-        this.futureOrderManager = new FutureOrderManager(createSpotClient());
-    }
+	public FutureOrderScheduler() {
+		this.symbols = CoinUtil.getAllFutureCoinsByTypeAndCategory();
+		this.positionManager = new PositionManager(createSpotClient());
+		this.futureOrderManager = new FutureOrderManager(createSpotClient());
+	}
 
-    public static void main(String[] args) {
-    	FutureOrderScheduler futureOrderScheduler = new FutureOrderScheduler();
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositions, 0, EXECUTION_INTERVAL_MINUTES, TimeUnit.MINUTES);
-    }
+	public static void main(String[] args) {
+		FutureOrderScheduler futureOrderScheduler = new FutureOrderScheduler();
+		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+		scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositions, 0, EXECUTION_INTERVAL_MINUTES,
+				TimeUnit.MINUTES);
+	}
 
-    public void takePositions() {
-    	 openOrderExist = false;
-         processed.clear();
-         errored.clear();
-         openOrders.clear();
-         openPositions.clear();
-         if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
-             System.out.println("Cooling period passed, resuming order execution...");
-             pauseNewOrderFor2Hrs = false;
-             pauseTimefor2Hrs = null;
-         }else if(pauseNewOrderFor2Hrs){
-             System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
-             return;
-         }
-         openOrders = futureOrderManager.getOpenOrders();
-         List<PositionInfo> openPositionList = positionManager.getAllOpenPositions();
-         openPositions = openPositionList.stream().filter(f->f.getPositionAmount()!=0.0).collect(Collectors.toList());
-         symbols = openPositionList.stream().map(m->m.getSymbol()).collect(Collectors.toList());
-         Integer aggLeverage = openPositionList.stream().map(m->m.getLeverage()).mapToInt(Integer::valueOf)
-                 .sum()/symbols.size();
-         System.out.println(aggLeverage);
-         symbols.removeAll(Arrays.asList(Coins.FUTURE_INVALID_SYMBOLS_FOR_TICKERS));
-         Collections.shuffle(symbols);
-         Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers(symbols.toArray(new String[0]));
-         
-        List<String> errors = new ArrayList<>();
-        Date startTime = new Date();
-        System.out.println("**************************************************************************************************************************************************");
-        System.out.println("Cron started at " + startTime);
-        Iterator<String> iterator = symbols.iterator();
-        while (iterator.hasNext() && !pauseNewOrderFor2Hrs) {
-            String coin = iterator.next();
-            openOrderExist= positionManager.openOrderExist(coin);
-        	if(keepEitherOpenOrderOrOpenPosition)
-        		if(openOrderExist)
-        			continue;
-                try {
-                    takePositionForCoin( coin, tickerMap);
-                } catch (BinanceConnectorException | BinanceClientException e) {
-                    CoinUtil.handleException(errors, coin, e);
-                } catch (Exception e) {
-                    System.out.println("Exception: " + e.getMessage());
-                } 
-            }
-        
-        printResult(symbols, errors, errored, startTime);
-    }
+	public void takePositions() {
+		openOrderExist = false;
+		processed.clear();
+		errored.clear();
+		openOrders.clear();
+		openPositions.clear();
+		tickerMap.clear();
+		upMovement = 0;
+		downMovement = 0;
+		if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
+			System.out.println("Cooling period passed, resuming order execution...");
+			pauseNewOrderFor2Hrs = false;
+			pauseTimefor2Hrs = null;
+		} else if (pauseNewOrderFor2Hrs) {
+			System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
+			return;
+		}
+		openOrders = futureOrderManager.getOpenOrders();
+		List<PositionInfo> openPositionList = positionManager.getAllOpenPositions();
+		openPositions = openPositionList.stream().filter(f -> f.getPositionAmount() != 0.0)
+				.collect(Collectors.toList());
+		symbols = openPositionList.stream().map(m -> m.getSymbol()).collect(Collectors.toList());
+		Integer aggLeverage = openPositionList.stream().map(m -> m.getLeverage()).mapToInt(Integer::valueOf).sum()
+				/ symbols.size();
+		System.out.println(aggLeverage);
+		symbols.removeAll(Arrays.asList(Coins.FUTURE_INVALID_SYMBOLS_FOR_TICKERS));
+		Collections.shuffle(symbols);
+		tickerMap = MarketSentimentAnalyzer.getTickers(symbols.toArray(new String[0]));
+		upMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_UP);
+		downMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_DOWN);
+		List<String> errors = new ArrayList<>();
+		Date startTime = new Date();
+		System.out.println(
+				"**************************************************************************************************************************************************");
+		System.out.println("Cron started at " + startTime);
+		//Iterator<String> iterator = symbols.iterator();
+		Set<String> keySets = tickerMap.keySet();
+		// while (iterator.hasNext() && !pauseNewOrderFor2Hrs) {
+		
+		keySets.forEach(coin -> {
+			if (pauseNewOrderFor2Hrs) {
+				System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
+				return;
+			}
+			// String coin = iterator.next();
+			//openOrderExist = positionManager.openOrderExist(coin);
+			openOrderExist = CoinUtil.openOrderExist(coin, openOrders);
+			if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist && coin.endsWith("USDC"))) {
+				try {
+					takePositionForCoin(coin, tickerMap);
+				} catch (BinanceConnectorException | BinanceClientException e) {
+					CoinUtil.handleException(errors, coin, e);
+				} catch (Exception e) {
+					System.out.println("Exception: " + e.getMessage());
+				}
+			}
+		});
 
-    private void printResult(List<String> symbols, List<String> errors, List<String> errored, Date startTime) {
-        symbols.removeAll(errored);
-        Date finishedTime = new Date();
-        System.out.println(CRON_FINISHED_MESSAGE + finishedTime);
-        System.out.println(TOTAL_TIME_MESSAGE + (finishedTime.getTime() - startTime.getTime()) / (60.0 * 1000.0) + " minutes" + " \nProcessed Coins : " + processed);
-        System.out.println("Errors: " + errors + "\nCoin didn't get processed : " + errored);
-        System.out.println("**************************************************************************************************************************************************");
-    }
+		printResult(new ArrayList<>(keySets), errors, errored, startTime);
+	}
 
-    private void takePositionForCoin(String coin, Map<String, TickerInfo> tickerInfoMap)
-            throws BinanceConnectorException, BinanceClientException {
-        List<PositionInfo> positionInfos = CoinUtil.getOpenPosition(coin,openPositions);
-        PositionInfo positionInfo = positionInfos.isEmpty()?null:positionInfos.get(0);
-        Map<String, Object> parameters = CoinUtil.updateParameters( coin, tickerInfoMap);
-        if (parameters == null) {
-            return;
-        }
-        System.out.println("Current Position Info: " + positionInfo);
-        if (positionInfo==null ) {
-        	if((openOrders.size() <= Coins.OPEN_ORDER_THRESHOLD || openPositions.size() <= Coins.OPEN_POSITION_THRESHOLD) && !openOrderExist) {
-        		if(!pauseCreateOrders) {
-        			System.out.println("Creating Order for : " + parameters);
-        			futureOrderManager.createFuturePosition(parameters, 0);
-        		}
-        	}
-        } else if (positionInfo.getPositionAmount() < 0.0) {
-            System.out.println("Handling Existing Sell Order : " + positionInfo);
-            positionManager.handleNegativePosition(parameters, coin, positionInfo);
-        } else if (positionInfo.getPositionAmount()> 0.0){
-            System.out.println("Handling Existing Buy Order : " + positionInfo);
-            positionManager.handlePositivePosition(parameters, coin, positionInfo);
-        }
-    }
+	private void printResult(List<String> symbols, List<String> errors, List<String> errored, Date startTime) {
+		symbols.removeAll(errored);
+		Date finishedTime = new Date();
+		System.out.println(CRON_FINISHED_MESSAGE + finishedTime);
+		System.out.println(TOTAL_TIME_MESSAGE + (finishedTime.getTime() - startTime.getTime()) / (60.0 * 1000.0)
+				+ " minutes" + " \nProcessed Coins : " + processed);
+		System.out.println("Errors: " + errors + "\nCoin didn't get processed : " + errored);
+		System.out.println(
+				"**************************************************************************************************************************************************");
+	}
 
-    
+	private void takePositionForCoin(String coin, Map<String, TickerInfo> tickerInfoMap)
+			throws BinanceConnectorException, BinanceClientException {
+		List<PositionInfo> positionInfos = CoinUtil.getOpenPosition(coin, openPositions);
+		PositionInfo positionInfo = positionInfos.isEmpty() ? null : positionInfos.get(0);
+		Map<String, Object> parameters = CoinUtil.updateParameters(coin, tickerInfoMap);
+		if (parameters == null) {
+			return;
+		}
+		System.out.println("Current Position Info: " + positionInfo);
+		int maxThreshold = downMovement >= upMovement ? Coins.MAX_OPEN_ORDER_AND_OPEN_POSITION_THRESHOLD * 2
+				: Coins.MAX_OPEN_ORDER_AND_OPEN_POSITION_THRESHOLD;
+		if (positionInfo == null) {
+			if (!openOrderExist
+					&& ((openOrders.size() <= Coins.OPEN_ORDER_THRESHOLD
+							&& openPositions.size() <= Coins.OPEN_POSITION_THRESHOLD)
+							|| (openOrders.size() + openPositions.size() < maxThreshold))
+					|| (openOrders.size() + openPositions.size() < maxThreshold && downMovement >= upMovement)) {
+				if (!pauseCreateOrders) {
+					System.out.println("Creating Order for : " + parameters);
+					futureOrderManager.createFuturePosition(parameters, 0);
+				}
+			}
+			return;
+		} else if (positionInfo.getPositionAmount() < 0.0) {
+			System.out.println("Handling Existing Sell Order : " + positionInfo);
+			positionManager.handleNegativePosition(parameters, coin, positionInfo);
+		} else if (positionInfo.getPositionAmount() > 0.0) {
+			System.out.println("Handling Existing Buy Order : " + positionInfo);
+			positionManager.handlePositivePosition(parameters, coin, positionInfo);
+		}
+	}
+
 	public static List<String> getAllFutureCoins() {
-        return CoinUtil.getAllFutureCoinsByTypeAndCategory(Coins.FUTURE_USDT_COINS_IN_ACTION);
-    }
+		return CoinUtil.getAllFutureCoinsByTypeAndCategory(Coins.FUTURE_USDT_COINS_IN_ACTION);
+	}
 }
 
 //    private boolean openOrderExist(String symbol) {

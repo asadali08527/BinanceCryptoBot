@@ -38,6 +38,10 @@ class FutureOrderManager extends ExceptionManager{
     public void createFuturePosition(Map<String, Object> parameters, int retry) {
         try {
             String result = client.createFutures().createFuturesPosition(parameters);
+            Gson gson = new Gson();
+            Type orderListType = new TypeToken<OpenOrderInfo>() {}.getType();
+            OpenOrderInfo openOrderInfos = gson.fromJson(result, orderListType);
+            FutureOrderScheduler.openOrders.add(openOrderInfos);
             FutureOrderScheduler.processed.add(String.valueOf(parameters.get("symbol")));
             System.out.println("Position Creation status for coin " + parameters + " Result: " + result);
         } catch (BinanceConnectorException e) {

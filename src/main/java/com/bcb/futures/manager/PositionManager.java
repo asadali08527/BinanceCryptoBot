@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.bcb.client.SpotClient;
 import com.bcb.exceptions.BinanceClientException;
@@ -63,7 +64,7 @@ public class PositionManager extends ExceptionManager {
                 increasePositionAmount(parameters, Coins.SELL_SIDE);
                 System.out.println(POSITION_INCREASED_MESSAGE + parameters);
             } else if (unRealizedProfit >= 1.0 && parameters != null) {
-                closeAndCreatePosition(coin, positionInfo, parameters);
+                closeAndCreatePosition(coin, positionInfo, parameters, Coins.SELL_SIDE);
             }
         } else if (unRealizedProfit < 0) {
             handleNegativeUnrealizedProfitForSellOrder(parameters, coin, positionInfo);
@@ -75,7 +76,7 @@ public class PositionManager extends ExceptionManager {
         Double unRealizedProfit = positionInfo.getUnRealizedProfit();
 
         if (unRealizedProfit >= 1.0 && parameters != null) {
-            closeAndCreatePosition(coin, positionInfo, parameters);
+            closeAndCreatePosition(coin, positionInfo, parameters, Coins.BUY_SIDE);
         } else if (unRealizedProfit >= 1.0) {
             closeFuturePosition(coin, positionInfo);
         } else if (!FutureOrderScheduler.pauseCreateOrders && unRealizedProfit >= 0.0 && isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
@@ -86,9 +87,22 @@ public class PositionManager extends ExceptionManager {
         }
     }
 
-    private void closeAndCreatePosition(String coin, PositionInfo positionInfo, Map<String, Object> parameters)
+    private void closeAndCreatePosition(String coin, PositionInfo positionInfo, Map<String, Object> parameters, String side)
             throws BinanceConnectorException, BinanceClientException {
+    	//if(FutureOrderScheduler.tickerMap.get(coin).getLastPrice()>positionInfo.getMarkPrice())
         closeFuturePosition(coin, positionInfo);
+        //FutureOrderManager.getInstance(this.client).createFuturePosition(parameters, 0);
+        takePositionByMarketPrice(parameters, side);
+    }
+    
+    private void takePositionByMarketPrice(Map<String, Object> parameters, String side)
+            throws BinanceConnectorException, BinanceClientException {
+        parameters.put("side", side);
+        parameters.put("type","MARKET");
+        parameters.remove("price");
+        parameters.remove("timeInForce");
+        parameters.remove("closePosition");
+        parameters.remove("newOrderRespType");
         FutureOrderManager.getInstance(this.client).createFuturePosition(parameters, 0);
     }
 
@@ -105,14 +119,12 @@ public class PositionManager extends ExceptionManager {
 
     private void handleNegativeUnrealizedProfitForSellOrder(Map<String, Object> parameters, String coin,
                                                             PositionInfo positionInfo) throws BinanceConnectorException, BinanceClientException {
-        if (positionInfo.getUnRealizedProfit() >= 1.0 && parameters != null) {
-            closeAndCreatePosition(coin, positionInfo, parameters);
-        } else if (positionInfo.getUnRealizedProfit() <= -2.0) {
+        if (positionInfo.getUnRealizedProfit() <= -5.0) {
         	System.out.println("Closing SELL order for coin " + coin + ": " + positionInfo);
             closeFuturePosition(coin, positionInfo);
         } else if (parameters != null && CoinUtil.getPercentageGap(positionInfo.getEntryPrice(), positionInfo.getMarkPrice())
                 >= Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD) {
-            closeAndCreatePosition(coin, positionInfo, parameters);
+            closeAndCreatePosition(coin, positionInfo, parameters, Coins.SELL_SIDE);
         }
     }
 
@@ -180,6 +192,5 @@ public class PositionManager extends ExceptionManager {
         }
         return null;
     }
-	
 
 }

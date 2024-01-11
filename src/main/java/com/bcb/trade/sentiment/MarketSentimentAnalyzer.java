@@ -18,6 +18,7 @@ import com.bcb.impl.SpotClientImpl;
 import com.bcb.impl.spot.Market;
 import com.bcb.orders.futures.test.api.HistoricalDataFetcher;
 import com.bcb.trade.constants.Coins;
+import com.bcb.trade.util.CoinUtil;
 import com.bcb.transfer.Sentiment;
 import com.bcb.transfer.TickerInfo;
 import com.google.gson.Gson;
@@ -35,12 +36,8 @@ public class MarketSentimentAnalyzer {
         TickerInfo tickerInfo = tickerMap.get(coin);
         if(tickerInfo==null)
             return null;
-        Map<String, List<TickerInfo>> marketMovement = tickerMap.entrySet().stream()
-                .collect(Collectors.groupingBy(entry ->
-                                entry.getValue().getPriceChangePercent() < 0 && Math.abs(entry.getValue().getPriceChangePercent()) >= Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD ? "DOWN" : "UP",
-                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
-        int upCount = marketMovement.getOrDefault("UP",Collections.EMPTY_LIST).size();
-        int downCount = marketMovement.getOrDefault("DOWN", Collections.EMPTY_LIST).size();
+        int upCount = marketMovement(tickerMap,"UP");
+        int downCount = marketMovement(tickerMap,"DOWN");
         double longTermMA = calculateMovingAverage(coin, Coins.LONG_TERM_PERIOD);
         double shortTermMA = calculateMovingAverage(coin, Coins.SHORT_TERM_PERIOD);
         System.out.println("longTermMA: "+longTermMA+" | UpCount: "+upCount);
@@ -50,7 +47,7 @@ public class MarketSentimentAnalyzer {
             sentiment.setType(MarketType.LIMIT.toString());
         else
             sentiment.setType(type.toString());
-        sentiment.setSide(Coins.HOLD_SIDE);
+        sentiment.setSide(Coins.BUY_SIDE);
         // Smart Entry Strategy
         if (upCount > downCount) {
             if (shortTermMA > longTermMA && (tickerInfo.getPriceChangePercent() > 0 && tickerInfo.getPriceChangePercent() < Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD)) {
@@ -68,20 +65,20 @@ public class MarketSentimentAnalyzer {
             } else {
                 if(tickerInfo.getPriceChangePercent()>0 && shortTermMA >longTermMA)
                     sentiment.setSide(Coins.BUY_SIDE);
-                else if(tickerInfo.getPriceChangePercent()<0 && shortTermMA <longTermMA)
-                    sentiment.setSide(Coins.HOLD_SIDE);
+                else if(tickerInfo.getPriceChangePercent()<0 && shortTermMA <longTermMA && upCount > downCount * 2)
+                    sentiment.setSide(Coins.BUY_SIDE);
             }
-        } else if (upCount < downCount) {
+        } else if (upCount <= downCount) {
             if (shortTermMA < longTermMA) {
                 if (tickerInfo.getPriceChangePercent() < -Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD_10) {
                     sentiment.setSide(Coins.BUY_SIDE);
                 } else if (upCount * 4 < downCount && tickerInfo.getPriceChangePercent() < 0 && tickerInfo.getPriceChangePercent() > -Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD) {
                     sentiment.setSide(Coins.SELL_SIDE);
                 } else {
-                    sentiment.setSide(Coins.HOLD_SIDE);
+                    sentiment.setSide(Coins.SELL_SIDE);
                 }
             } else {
-                sentiment.setSide(Coins.HOLD_SIDE);
+                sentiment.setSide(Coins.SELL_SIDE);
             }
         } else {
             sentiment.setSide(Coins.HOLD_SIDE);
@@ -96,7 +93,7 @@ public class MarketSentimentAnalyzer {
                 else
                     sentiment.setPrice(String.valueOf(tickerInfo.getLowPrice()));
             } else
-                sentiment.setPrice(String.valueOf(tickerInfo.getHighPrice()));
+                sentiment.setPrice(String.valueOf(tickerInfo.getLastPrice()));
         }else{
             sentiment.setPrice(String.valueOf(tickerInfo.getLastPrice()));
         }
@@ -180,7 +177,7 @@ public class MarketSentimentAnalyzer {
 
             tickerInfoMap.putAll(batchMap);
         }
-        return tickerInfoMap;
+        return CoinUtil.keepAlternatingEntries(tickerInfoMap);
     }
 
     private static String[] getCoinSubset(String[] allCoins, int startIndex, int endIndex) {
@@ -199,6 +196,18 @@ public class MarketSentimentAnalyzer {
         System.arraycopy(allCoins, startIndex, subset, 0, subsetSize);
 
         return subset;
+    }
+    
+    public static Integer marketMovement(Map<String,TickerInfo> tickerMap, String movement) {
+    	Map<String, List<TickerInfo>> marketMovement = tickerMap.entrySet().stream()
+                .collect(Collectors.groupingBy(entry ->
+                                entry.getValue().getPriceChangePercent() < 0 && Math.abs(entry.getValue().getPriceChangePercent()) >= Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD ? "DOWN" : "UP",
+                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+    	if(Coins.MOVEMENT_UP.equalsIgnoreCase(movement))
+    		return marketMovement.getOrDefault("UP",Collections.emptyList()).size();
+    	else
+    		return marketMovement.getOrDefault("DOWN", Collections.emptyList()).size();
+       
     }
 
     public static void main(String[] args) {
