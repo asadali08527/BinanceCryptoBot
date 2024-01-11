@@ -40,7 +40,7 @@ public class FutureOrderExecutor {
 
     public static void executeCronJob() {
         pauseNewOrder = false;
-        tickerMap = MarketSentimentAnalyzer.getTickers();
+        tickerMap = MarketSentimentAnalyzer.getTickers(null);
         Map<String, Object> parameters = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
         List<String> symbols = CoinUtil.getAllFutureCoinsByTypeAndCategory();

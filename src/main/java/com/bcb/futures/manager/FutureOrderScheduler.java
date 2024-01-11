@@ -90,11 +90,11 @@ public class FutureOrderScheduler {
 				.collect(Collectors.toList());
 		symbols = openPositionList.stream().map(m -> m.getSymbol()).collect(Collectors.toList());
 		Integer aggLeverage = openPositionList.stream().map(m -> m.getLeverage()).mapToInt(Integer::valueOf).sum()
-				/ symbols.size();
+				/ openPositionList.size();
 		System.out.println(aggLeverage);
 		symbols.removeAll(Arrays.asList(Coins.FUTURE_INVALID_SYMBOLS_FOR_TICKERS));
 		Collections.shuffle(symbols);
-		tickerMap = MarketSentimentAnalyzer.getTickers(symbols.toArray(new String[0]));
+		tickerMap = MarketSentimentAnalyzer.getTickers(null, symbols.toArray(new String[0]));
 		upMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_UP);
 		downMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_DOWN);
 		List<String> errors = new ArrayList<>();

@@ -58,7 +58,7 @@ public class SmartFutureOrderExecutor {
         pauseNewOrder = false;
         processed.clear();
         errored.clear();
-        tickerMap = MarketSentimentAnalyzer.getTickers();
+        tickerMap = MarketSentimentAnalyzer.getTickers(null);
         Map<String, Object> parameters = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
         Date startTime = new Date();

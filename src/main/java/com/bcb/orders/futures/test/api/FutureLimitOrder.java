@@ -77,7 +77,7 @@ public class FutureLimitOrder {
             System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
             return;
         }
-        Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers();
+        Map<String, TickerInfo> tickerMap = MarketSentimentAnalyzer.getTickers(null);
         Map<String, Object> parameters = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
         Date startTime = new Date();
