@@ -45,7 +45,7 @@ public class CoinUtil {
 
 	private static String nonZeroQuantity(String quantity) {
 		if (quantity.equalsIgnoreCase("0") || quantity.equalsIgnoreCase("0.") || quantity.equalsIgnoreCase("0.0")) {
-			return "1";
+			return "0.01";
 		} else
 			return quantity;
 	}
@@ -53,6 +53,7 @@ public class CoinUtil {
 	public static String adjustPrecision(String qty) {
 		String quantity = qty.contains(".") ? qty.substring(0, qty.length() - 1)
 				: String.valueOf(Double.valueOf(qty) * 2);
+		quantity = quantity.equalsIgnoreCase("0") || quantity.equalsIgnoreCase("0.") || quantity.equalsIgnoreCase("0.0") || quantity.equalsIgnoreCase("0.00")? String.valueOf(Double.valueOf(qty) * 2) : quantity;
 		return nonZeroQuantity(quantity);
 	}
 
@@ -93,21 +94,31 @@ public class CoinUtil {
 
 	public static Map<String, Object> updateParameters(String coin, Map<String, TickerInfo> tickerMap) {
 		Map<String, Object> params = new HashMap<>();
-		Sentiment sentiment = MarketSentimentAnalyzer.getSentiment(coin, MarketType.LIMIT, tickerMap);
-		if (sentiment == null || sentiment.getSide() == null || Coins.HOLD_SIDE.equalsIgnoreCase(sentiment.getSide())) {
-			return null;
+		if (tickerMap==null || tickerMap.isEmpty()) {
+			params.put("symbol", coin);
+			params.put("type", MarketType.MARKET.toString());
+			params.put("quantity", CoinUtil.getQuantity(coin, MarketSentimentAnalyzer.getTicker(coin).getLastPrice()));
+			System.out.println("Parameters: " + params);
+			return params;
+		} else {
+			Sentiment sentiment = MarketSentimentAnalyzer.getSentiment(coin, MarketType.LIMIT, tickerMap);
+			if (sentiment == null || sentiment.getSide() == null
+					|| Coins.HOLD_SIDE.equalsIgnoreCase(sentiment.getSide())) {
+				return null;
+			}
+			params.put("symbol", sentiment.getSymbol());
+			params.put("side", sentiment.getSide());
+			params.put("type", sentiment.getType());
+			params.put("quantity", CoinUtil.getQuantity(sentiment.getSymbol(), Double.valueOf(sentiment.getPrice())));
+			params.put("price", sentiment.getPrice());
+			params.put("timeInForce", sentiment.getTimeInForce());
+			params.put("closePosition", sentiment.getClosePosition());
+			params.put("newOrderRespType", sentiment.getNewOrderRespType()); // Set the response type (ACK, RESULT,
+																				// FULL)
+			// params.put("timestamp", System.currentTimeMillis());
+			System.out.println("Parameters: " + params);
+			return params;
 		}
-		params.put("symbol", sentiment.getSymbol());
-		params.put("side", sentiment.getSide());
-		params.put("type", sentiment.getType());
-		params.put("quantity", CoinUtil.getQuantity(sentiment.getSymbol(), Double.valueOf(sentiment.getPrice())));
-		params.put("price", sentiment.getPrice());
-		params.put("timeInForce", sentiment.getTimeInForce());
-		params.put("closePosition", sentiment.getClosePosition());
-		params.put("newOrderRespType", sentiment.getNewOrderRespType()); // Set the response type (ACK, RESULT, FULL)
-		// params.put("timestamp", System.currentTimeMillis());
-		System.out.println("Parameters: " + params);
-		return params;
 	}
 
 	public static boolean checkIfCoolingPeriodPassed(Date pauseTimefor2Hrs) {
@@ -167,5 +178,23 @@ public class CoinUtil {
 		List<OpenOrderInfo> openOrderInfo = openOrders.stream().filter(f -> f.getSymbol().equalsIgnoreCase(coin))
 				.collect(Collectors.toList());
 		return !openOrderInfo.isEmpty();
+	}
+
+	private static int getMaxThreshold(Integer downMovement, Integer upMovement) {
+		return downMovement >= upMovement ? Coins.MAX_OPEN_ORDER_AND_OPEN_POSITION_THRESHOLD * 2
+				: Coins.MAX_OPEN_ORDER_AND_OPEN_POSITION_THRESHOLD;
+	}
+
+	public static boolean shouldCreateOrder(List<OpenOrderInfo> openOrders, List<PositionInfo> openPositions,
+			Integer downMovement, Integer upMovement) {
+		int maxThreshold = getMaxThreshold(downMovement, upMovement);
+		int totalOrdersAndPositions = openOrders.size() + openPositions.size();
+		return (openOrders.size() <= Coins.OPEN_ORDER_THRESHOLD
+				|| openPositions.size() <= Coins.OPEN_POSITION_THRESHOLD) && totalOrdersAndPositions < maxThreshold;
+	}
+
+	public static boolean openPositionExist(String coin, List<PositionInfo> openPositions) {
+		List<PositionInfo> positionInfos = getOpenPosition(coin, openPositions);
+		return positionInfos.isEmpty() ? false : true;
 	}
 }

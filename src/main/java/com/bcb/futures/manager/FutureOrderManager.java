@@ -48,7 +48,7 @@ class FutureOrderManager extends ExceptionManager{
             handleConnectorException(e);
         } catch (BinanceClientException e) {
             String errorCode = String.valueOf(e.getErrorCode());
-        	if (Coins.ERROR_CODE_1111.equalsIgnoreCase(errorCode) && retry <= 1) {
+        	if (Coins.ERROR_CODE_1111.equalsIgnoreCase(errorCode) && retry <= 5) {
                 retryAndLog(parameters, retry, REDUCING_PRECISION_MESSAGE);
             } else if (Coins.ERROR_CODE_4164.equalsIgnoreCase(errorCode) && retry <= 4) {
                 retryAndLog(parameters, retry, DOUBLING_QUANTITY_MESSAGE);

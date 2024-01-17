@@ -30,25 +30,17 @@ public class FutureOrderScheduler {
 	private static final int EXECUTION_INTERVAL_MINUTES = 5;
 	private static final String CRON_FINISHED_MESSAGE = "Cron Finished at ";
 	private static final String TOTAL_TIME_MESSAGE = "Total Time taken to Execute The Job : ";
-
+	public static List<OpenOrderInfo> openOrders = new ArrayList<>();
 	static List<String> errored = new ArrayList<>();
 	static List<String> invalidSymbol = new ArrayList<>();
 	static List<String> processed = new ArrayList<>();
 	static boolean pauseNewOrderFor2Hrs = false;
 	public static Date pauseTimefor2Hrs = null;
-	private static boolean keepEitherOpenOrderOrOpenPosition = false;
-	private static boolean openOrderExist = false;
 	public static boolean pauseCreateOrders = false;
-	private static List<PositionInfo> openPositions = new ArrayList<>();
-	public static List<OpenOrderInfo> openOrders = new ArrayList<>();
-	public static Map<String, TickerInfo> tickerMap = new HashMap<>();
-	private Integer upMovement = null;
-	private Integer downMovement = null;
 
 	private final PositionManager positionManager;
 	private final FutureOrderManager futureOrderManager;
 	private List<String> symbols = null;
-
 
 	private SpotClient createSpotClient() {
 		return new SpotClientImpl(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY, PrivateConfig.BASE_URLS[0]);
@@ -63,19 +55,20 @@ public class FutureOrderScheduler {
 	public static void main(String[] args) {
 		FutureOrderScheduler futureOrderScheduler = new FutureOrderScheduler();
 		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-		scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositions, 0, EXECUTION_INTERVAL_MINUTES,
-				TimeUnit.MINUTES);
+		scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositions, 0, EXECUTION_INTERVAL_MINUTES, TimeUnit.MINUTES);
+		//scheduler.scheduleAtFixedRate(futureOrderScheduler::takeOppositePositions, 0, 1, TimeUnit.MINUTES);
 	}
 
 	public void takePositions() {
-		openOrderExist = false;
+		boolean keepEitherOpenOrderOrOpenPosition = false;
+		boolean openOrderExist = false;
+		Integer upMovement = null;
+		Integer downMovement = null;
 		processed.clear();
 		errored.clear();
-		openOrders.clear();
-		openPositions.clear();
-		tickerMap.clear();
-		upMovement = 0;
-		downMovement = 0;
+		List<PositionInfo> openPositions = new ArrayList<>();
+		Map<String, TickerInfo> tickerMap = new HashMap<>();
+
 		if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
 			System.out.println("Cooling period passed, resuming order execution...");
 			pauseNewOrderFor2Hrs = false;
@@ -86,13 +79,23 @@ public class FutureOrderScheduler {
 		}
 		openOrders = futureOrderManager.getOpenOrders();
 		List<PositionInfo> openPositionList = positionManager.getAllOpenPositions();
+		List<String> coinsNotToProcess= Arrays.asList(Coins.FUTURE_SYMBOLS_NOT_TO_BE_PROCESSED);
+		List<String> invalidSymbolList= Arrays.asList(Coins.FUTURE_INVALID_SYMBOLS_FOR_TICKERS);
+		openPositionList = openPositionList.stream().filter(f->{return !(coinsNotToProcess.contains(f.getSymbol())||invalidSymbolList.contains(f.getSymbol()));}).collect(Collectors.toList());
 		openPositions = openPositionList.stream().filter(f -> f.getPositionAmount() != 0.0)
 				.collect(Collectors.toList());
+		openPositions = openPositions.stream()
+				.filter(f -> !(f.getSymbol().equalsIgnoreCase("XRPUSDC") || f.getSymbol().equalsIgnoreCase("XRPUSDT")))
+				.collect(Collectors.toList());
+		System.out.println("open Orders " + openOrders.size());
+		System.out.println("open Positions " + openPositions.size());
+
 		symbols = openPositionList.stream().map(m -> m.getSymbol()).collect(Collectors.toList());
 		Integer aggLeverage = openPositionList.stream().map(m -> m.getLeverage()).mapToInt(Integer::valueOf).sum()
 				/ openPositionList.size();
 		System.out.println(aggLeverage);
 		symbols.removeAll(Arrays.asList(Coins.FUTURE_INVALID_SYMBOLS_FOR_TICKERS));
+		symbols.removeAll(Arrays.asList(Coins.FUTURE_SYMBOLS_NOT_TO_BE_PROCESSED));
 		Collections.shuffle(symbols);
 		tickerMap = MarketSentimentAnalyzer.getTickers(null, symbols.toArray(new String[0]));
 		upMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_UP);
@@ -102,30 +105,115 @@ public class FutureOrderScheduler {
 		System.out.println(
 				"**************************************************************************************************************************************************");
 		System.out.println("Cron started at " + startTime);
-		//Iterator<String> iterator = symbols.iterator();
 		Set<String> keySets = tickerMap.keySet();
-		// while (iterator.hasNext() && !pauseNewOrderFor2Hrs) {
-		
-		keySets.forEach(coin -> {
+		Iterator<String> iterator = keySets.iterator();
+
+		while (iterator.hasNext() && !pauseNewOrderFor2Hrs) {
+			String coin = iterator.next();
 			if (pauseNewOrderFor2Hrs) {
-				System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
+				System.out.println(
+						"Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
 				return;
 			}
 			// String coin = iterator.next();
-			//openOrderExist = positionManager.openOrderExist(coin);
+			// openOrderExist = positionManager.openOrderExist(coin);
 			openOrderExist = CoinUtil.openOrderExist(coin, openOrders);
 			if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist && coin.endsWith("USDC"))) {
 				try {
-					takePositionForCoin(coin, tickerMap);
+					takePositionForCoin(coin, tickerMap, upMovement, downMovement, openPositions, openOrders);
 				} catch (BinanceConnectorException | BinanceClientException e) {
 					CoinUtil.handleException(errors, coin, e);
 				} catch (Exception e) {
 					System.out.println("Exception: " + e.getMessage());
 				}
 			}
-		});
-
+		}
+		System.out.println(
+				"**************************************************************************************************************************************************");
 		printResult(new ArrayList<>(keySets), errors, errored, startTime);
+	}
+
+	public void takeOppositePositions() {
+		boolean openOrderExist = false;
+		List<PositionInfo> openPositions = new ArrayList<>();
+		List<OpenOrderInfo> openOrderList = new ArrayList<>();
+		processed.clear();
+		errored.clear();
+		boolean keepEitherOpenOrderOrOpenPosition = false;
+		if (pauseNewOrderFor2Hrs && CoinUtil.checkIfCoolingPeriodPassed(pauseTimefor2Hrs)) {
+			System.out.println("Cooling period passed, resuming order execution...");
+			pauseNewOrderFor2Hrs = false;
+			pauseTimefor2Hrs = null;
+		} else if (pauseNewOrderFor2Hrs) {
+			System.out.println("Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
+			return;
+		}
+		openOrderList = futureOrderManager.getOpenOrders();
+		List<PositionInfo> openPositionList = positionManager.getAllOpenPositions();
+		openPositions = openPositionList.stream().filter(f -> f.getPositionAmount() != 0.0)
+				.collect(Collectors.toList());
+		System.out.println("open Orders " + openOrderList.size());
+		System.out.println("open Positions " + openPositions.size());
+		List<String> oppositeSymols = Arrays.asList(Coins.FUTURE_OPPOSITE_SYMBOLS);
+		//oppositeSymols.remove("XRP");
+		///oppositeSymols.remove("SOL");
+		// tickerMap = MarketSentimentAnalyzer.getTickers(null,
+		// oppositeSymols.toArray(new String[0]));
+		// upMovement = MarketSentimentAnalyzer.marketMovement(tickerMap,
+		// Coins.MOVEMENT_UP);
+		// downMovement = MarketSentimentAnalyzer.marketMovement(tickerMap,
+		// Coins.MOVEMENT_DOWN);
+		List<String> errors = new ArrayList<>();
+		Date startTime = new Date();
+		System.out.println(
+				"===================================================================================================================================");
+		System.out.println("Cron Job for Opposite Coins started at " + startTime);
+		//Set<String> keySets = tickerMap.keySet();
+		Iterator<String> iterator = oppositeSymols.iterator();
+		String[] coins = { Coins.USDC, Coins.USDT };
+		while (iterator.hasNext() && !pauseNewOrderFor2Hrs) {
+			String cc = iterator.next();
+			for (String symbol : coins) {
+				 String coin = cc+symbol;
+				Map<String, Object> parameters = CoinUtil.updateParameters(coin, null);
+				if (Coins.USDC.equalsIgnoreCase(symbol))
+					parameters.put("side", Coins.SELL_SIDE);
+				else
+					parameters.put("side", Coins.BUY_SIDE);
+				if (pauseNewOrderFor2Hrs) {
+					System.out.println(
+							"Got Futures Trading Quantitative Rules violated error: Job paused for next 2 hours...");
+					return;
+				}
+				
+				// String coin = iterator.next();
+				// openOrderExist = positionManager.openOrderExist(coin);
+				openOrderExist = CoinUtil.openOrderExist(coin, openOrderList);
+				List<PositionInfo> positionInfoList = CoinUtil.getOpenPosition(coin, openPositions);
+				PositionInfo positionInfo = positionInfoList.size()!=0 ? positionInfoList.get(0):null;
+				boolean openPositionExist = positionInfo != null ? true : false;
+				if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist)) {
+					try {
+						if (!openPositionExist) {
+							futureOrderManager.createFuturePosition(parameters, 0);
+						} else if (positionInfo.getPositionAmount() < 0.0) {
+							System.out.println("Handling Existing Sell Order : " + positionInfo);
+							positionManager.handleNegativePosition(parameters, coin, positionInfo);
+						} else if (positionInfo.getPositionAmount() > 0.0) {
+							System.out.println("Handling Existing Buy Order : " + positionInfo);
+							positionManager.handlePositivePosition(parameters, coin, positionInfo);
+						}
+					} catch (BinanceConnectorException | BinanceClientException e) {
+						CoinUtil.handleException(errors, coin, e);
+					} catch (Exception e) {
+						System.out.println("Exception: " + e.getMessage());
+					}
+				}
+			}
+		}
+		System.out.println(
+				"===================================================================================================================================");
+		printResult(new ArrayList<>(oppositeSymols), errors, errored, startTime);
 	}
 
 	private void printResult(List<String> symbols, List<String> errors, List<String> errored, Date startTime) {
@@ -139,7 +227,8 @@ public class FutureOrderScheduler {
 				"**************************************************************************************************************************************************");
 	}
 
-	private void takePositionForCoin(String coin, Map<String, TickerInfo> tickerInfoMap)
+	private void takePositionForCoin(String coin, Map<String, TickerInfo> tickerInfoMap, Integer upMovement,
+			Integer downMovement, List<PositionInfo> openPositions, List<OpenOrderInfo> openOrders)
 			throws BinanceConnectorException, BinanceClientException {
 		List<PositionInfo> positionInfos = CoinUtil.getOpenPosition(coin, openPositions);
 		PositionInfo positionInfo = positionInfos.isEmpty() ? null : positionInfos.get(0);
@@ -148,20 +237,14 @@ public class FutureOrderScheduler {
 			return;
 		}
 		System.out.println("Current Position Info: " + positionInfo);
-		int maxThreshold = downMovement >= upMovement ? Coins.MAX_OPEN_ORDER_AND_OPEN_POSITION_THRESHOLD * 2
-				: Coins.MAX_OPEN_ORDER_AND_OPEN_POSITION_THRESHOLD;
 		if (positionInfo == null) {
-			if (!openOrderExist
-					&& ((openOrders.size() <= Coins.OPEN_ORDER_THRESHOLD
-							&& openPositions.size() <= Coins.OPEN_POSITION_THRESHOLD)
-							|| (openOrders.size() + openPositions.size() < maxThreshold))
-					|| (openOrders.size() + openPositions.size() < maxThreshold && downMovement >= upMovement)) {
+			if (CoinUtil.shouldCreateOrder(openOrders, openPositions, downMovement, upMovement)) {
 				if (!pauseCreateOrders) {
 					System.out.println("Creating Order for : " + parameters);
 					futureOrderManager.createFuturePosition(parameters, 0);
 				}
+				return;
 			}
-			return;
 		} else if (positionInfo.getPositionAmount() < 0.0) {
 			System.out.println("Handling Existing Sell Order : " + positionInfo);
 			positionManager.handleNegativePosition(parameters, coin, positionInfo);

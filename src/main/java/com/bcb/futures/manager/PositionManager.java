@@ -119,12 +119,12 @@ public class PositionManager extends ExceptionManager {
 
     private void handleNegativeUnrealizedProfitForSellOrder(Map<String, Object> parameters, String coin,
                                                             PositionInfo positionInfo) throws BinanceConnectorException, BinanceClientException {
-        if (positionInfo.getUnRealizedProfit() <= -5.0) {
+        if (positionInfo.getUnRealizedProfit() <= -Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD_10) {
         	System.out.println("Closing SELL order for coin " + coin + ": " + positionInfo);
-            closeFuturePosition(coin, positionInfo);
+            //closeFuturePosition(coin, positionInfo);
         } else if (parameters != null && CoinUtil.getPercentageGap(positionInfo.getEntryPrice(), positionInfo.getMarkPrice())
                 >= Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD) {
-            closeAndCreatePosition(coin, positionInfo, parameters, Coins.SELL_SIDE);
+            //closeAndCreatePosition(coin, positionInfo, parameters, Coins.SELL_SIDE);
         }
     }
 
@@ -135,7 +135,7 @@ public class PositionManager extends ExceptionManager {
             System.out.println("Position Increased for " + parameters);
         } else if (CoinUtil.getPercentageGap(positionInfo.getLiquidationPrice(), positionInfo.getMarkPrice())
                 <= Coins.POSITION_CLOSE_THRESOLD_PERCENTAGE) {
-            closeFuturePosition(coin, positionInfo);
+            //closeFuturePosition(coin, positionInfo);
         }
     }
 

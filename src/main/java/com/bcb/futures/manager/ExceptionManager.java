@@ -36,7 +36,7 @@ public class ExceptionManager {
             printErrorMessage(e.getMessage(),parameters);
         } else if (Coins.ERROR_CODE_2019.equalsIgnoreCase(errorCode)) {
             System.out.println(INSUFFICIENT_MARGIN_MESSAGE);
-            FutureOrderScheduler.pauseCreateOrders = true;
+            //FutureOrderScheduler.pauseCreateOrders = true;
             //FutureOrderScheduler.pauseTimefor2Hrs = new Date();
             printErrorMessage(e.getMessage(),parameters);
         }else if (Coins.ERROR_CODE_4141.equalsIgnoreCase(errorCode)) {

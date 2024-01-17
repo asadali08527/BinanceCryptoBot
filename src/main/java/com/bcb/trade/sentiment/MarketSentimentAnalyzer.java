@@ -130,7 +130,7 @@ public class MarketSentimentAnalyzer {
 				.collect(Collectors.toList());
 	}
 
-	private static TickerInfo getTicker(String symbol) {
+	public static TickerInfo getTicker(String symbol) {
 		Map<String, Object> parameters = new LinkedHashMap<>();
 		Market market = client.createMarket();
 		parameters.put("symbol", symbol);
