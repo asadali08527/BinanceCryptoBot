@@ -1,6 +1,7 @@
 package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,7 @@ class FutureOrderManager extends ExceptionManager{
 	public List<OpenOrderInfo> getOpenOrders() {
         Gson gson = new Gson();
         Map<String,Object> parameters = new LinkedHashMap<>();
+        //parameters.put("timestamp",new Date().getTime()+"");
         String result = client.createFutures().getFuturesOpenOrders(parameters);
         Type orderListType = new TypeToken<List<OpenOrderInfo>>() {}.getType();
         List<OpenOrderInfo> openOrderInfos = gson.fromJson(result, orderListType);
