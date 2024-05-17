@@ -36,6 +36,7 @@ public class FutureOrderSchedulerTEE {
 	static List<String> invalidSymbol = new ArrayList<>();
 	static List<String> processed = new ArrayList<>();
 	static boolean pauseNewOrderFor2Hrs = false;
+	static boolean handleWithOpenLimitOrder = true;
 	public static Date pauseTimefor2Hrs = null;
 	public static boolean pauseCreateOrders = false;
 
@@ -54,16 +55,17 @@ public class FutureOrderSchedulerTEE {
 	}
 
 	public static void main(String[] args) {
-		FutureOrderSchedulerTEE futureOrderScheduler = new FutureOrderSchedulerTEE();
-		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+		FutureOrderScheduler futureOrderScheduler = new FutureOrderScheduler();
+		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);		
 //		scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositions, 0, EXECUTION_INTERVAL_MINUTES,
 //				TimeUnit.MINUTES);
 		scheduler.scheduleAtFixedRate(futureOrderScheduler::takeOppositePositions, 0, 1, TimeUnit.MINUTES);
-		scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositionsForPrefixed1000, 0, 47, TimeUnit.SECONDS);
+//		scheduler.scheduleAtFixedRate(futureOrderScheduler::takePositionsForPrefixed1000, 0, 47, TimeUnit.SECONDS);
 
 	}
 
 	public void takePositions() {
+		
 		boolean keepEitherOpenOrderOrOpenPosition = false;
 		boolean openOrderExist = false;
 		Integer upMovement = null;
@@ -81,6 +83,7 @@ public class FutureOrderSchedulerTEE {
 			return;
 		}
 		openOrders = futureOrderManager.getOpenOrders();
+		//openOrders = new ArrayList<>();
 		openOrders = openOrders.stream()
 				.filter(f -> !(Arrays.asList(Coins.FUTURE_SYMBOLS_WITH_PREFIX_1000).contains(f.getSymbol())
 						|| f.getSymbol().startsWith("1000")))
@@ -139,7 +142,7 @@ public class FutureOrderSchedulerTEE {
 			// String coin = iterator.next();
 			// openOrderExist = positionManager.openOrderExist(coin);
 			openOrderExist = CoinUtil.openOrderExist(coin, openOrders);
-			if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist && coin.endsWith("USDC"))) {
+			if (!(keepEitherOpenOrderOrOpenPosition && coin.endsWith("USDC"))) {
 				try {
 					takePositionForCoin(coin, tickerMap, upMovement, downMovement, openPositions, openOrders);
 				} catch (BinanceConnectorException | BinanceClientException e) {
@@ -195,12 +198,15 @@ public class FutureOrderSchedulerTEE {
 				String coin = cc + symbol;
 				if (Arrays.asList(Coins.SKIP_LIST).contains(coin))
 					continue;
-				Map<String, Object> parameters = CoinUtil.updateParameters(coin, tickerMap, MarketType.MARKET);
+				Map<String, Object> parameters = CoinUtil.getParameters(coin, tickerMap, MarketType.MARKET);
+				List<PositionInfo> positionInfoList = CoinUtil.getOpenPosition(coin, openPositions);
+				PositionInfo positionInfo = positionInfoList.size() != 0 ? positionInfoList.get(0) : null;
+				boolean openPositionExist = positionInfo != null ? true : false;
 				if (Coins.USDT.equalsIgnoreCase(symbol)) {
 					parameters.put("side", Coins.BUY_SIDE);
 				} else {
 					parameters.put("side", Coins.SELL_SIDE);
-					if (upMovement > downMovement)
+					if (upMovement > downMovement && !openPositionExist)
 						continue;
 				}
 				if (pauseNewOrderFor2Hrs) {
@@ -212,21 +218,18 @@ public class FutureOrderSchedulerTEE {
 				// String coin = iterator.next();
 				// openOrderExist = positionManager.openOrderExist(coin);
 				openOrderExist = CoinUtil.openOrderExist(coin, openOrderList);
-				List<PositionInfo> positionInfoList = CoinUtil.getOpenPosition(coin, openPositions);
-				PositionInfo positionInfo = positionInfoList.size() != 0 ? positionInfoList.get(0) : null;
-				boolean openPositionExist = positionInfo != null ? true : false;
-				if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist)) {
+				
+				if (!keepEitherOpenOrderOrOpenPosition) {
 					try {
-
-						if (!openPositionExist) {
+						if (!openPositionExist && !openOrderExist) {
 							futureOrderManager.createFuturePosition(parameters, 0);
 						} else if (positionInfo.getPositionAmount() < 0.0) {
 							System.out.println("Handling Existing Sell Order : " + positionInfo);
-							positionManager.handleNegativePosition(parameters, coin, positionInfo, tickerMap.get(coin));
+							positionManager.handleNegativePosition(parameters, coin, positionInfo, tickerMap.get(coin),openOrderList);
 						} else if (positionInfo.getPositionAmount() > 0.0) {
 							// continue;
 							System.out.println("Handling Existing Buy Order : " + positionInfo);
-							positionManager.handlePositivePosition(parameters, coin, positionInfo, tickerMap.get(coin));
+							positionManager.handlePositivePosition(parameters, coin, positionInfo, tickerMap.get(coin),openOrderList);
 						}
 					} catch (BinanceConnectorException | BinanceClientException e) {
 						CoinUtil.handleException(errors, coin, e);
@@ -282,7 +285,7 @@ public class FutureOrderSchedulerTEE {
 
 			if (Arrays.asList(Coins.SKIP_LIST).contains(coin))
 				continue;
-			Map<String, Object> parameters = CoinUtil.updateParameters(symbol, tickerMap, MarketType.MARKET);
+			Map<String, Object> parameters = CoinUtil.getParameters(symbol, tickerMap, MarketType.MARKET);
 			parameters.put("symbol", coin);
 			if (upMovement > downMovement) {
 				parameters.put("side", Coins.BUY_SIDE);
@@ -302,18 +305,18 @@ public class FutureOrderSchedulerTEE {
 			List<PositionInfo> positionInfoList = CoinUtil.getOpenPosition(coin, openPositions);
 			PositionInfo positionInfo = positionInfoList.size() != 0 ? positionInfoList.get(0) : null;
 			boolean openPositionExist = positionInfo != null ? true : false;
-			if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist)) {
+			if (!(keepEitherOpenOrderOrOpenPosition)) {
 				try {
 
-					if (!openPositionExist) {
+					if (!openPositionExist && !openOrderExist) {
 						futureOrderManager.createFuturePosition(parameters, 0);
 					} else if (positionInfo.getPositionAmount() < 0.0) {
 						System.out.println("Handling Existing Sell Order : " + positionInfo);
-						positionManager.handleNegativePosition(parameters, coin, positionInfo, tickerMap.get(symbol));
+						positionManager.handleNegativePosition(parameters, coin, positionInfo, tickerMap.get(symbol),openOrderList);
 					} else if (positionInfo.getPositionAmount() > 0.0) {
 						// continue;
 						System.out.println("Handling Existing Buy Order : " + positionInfo);
-						positionManager.handlePositivePosition(parameters, coin, positionInfo, tickerMap.get(symbol));
+						positionManager.handlePositivePosition(parameters, coin, positionInfo, tickerMap.get(symbol),openOrderList);
 					}
 				} catch (BinanceConnectorException | BinanceClientException e) {
 					CoinUtil.handleException(errors, coin, e);
@@ -348,21 +351,22 @@ public class FutureOrderSchedulerTEE {
 //		if (positionInfo != null && parameters == null) {
 //			return;
 //		}
+		boolean openOrderExist = CoinUtil.openOrderExist(coin, openOrders);
 		System.out.println("Current Position Info: " + positionInfo);
 		if (positionInfo == null && parameters != null) {
 			if (CoinUtil.shouldCreateOrder(openOrders, openPositions, downMovement, upMovement)) {
-				if (!pauseCreateOrders) {
-					System.out.println("Creating Order for : " + parameters);
+				if (!pauseCreateOrders && !openOrderExist) {
+					System.out.println("Creating Position for : " + parameters);
 					futureOrderManager.createFuturePosition(parameters, 0);
 				}
 				return;
 			}
 		} else if (positionInfo.getPositionAmount() < 0.0) {
 			System.out.println("Handling Existing Sell Order : " + positionInfo);
-			positionManager.handleNegativePosition(parameters, coin, positionInfo, tickerInfoMap.get(coin));
+			positionManager.handleNegativePosition(parameters, coin, positionInfo, tickerInfoMap.get(coin),openOrders);
 		} else if (positionInfo.getPositionAmount() > 0.0) {
 			System.out.println("Handling Existing Buy Order : " + positionInfo);
-			positionManager.handlePositivePosition(parameters, coin, positionInfo, tickerInfoMap.get(coin));
+			positionManager.handlePositivePosition(parameters, coin, positionInfo, tickerInfoMap.get(coin),openOrders);
 		}
 	}
 
