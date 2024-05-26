@@ -21,7 +21,7 @@ public class OrderManager {
 		parameters.put("symbol", "XRPUSDT");
 		parameters.put("side", "BUY");
 		parameters.put("type", "MARKET");
-		parameters.put("quantity", "1000");
+		parameters.put("quantity", "100");
 		//parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(80.7325, false));
 		//parameters.put("timeInForce", Coins.TIME_IN_FORCE);
 		parameters.put("closePosition", "false");
@@ -30,6 +30,7 @@ public class OrderManager {
 		
 		System.out.println("Creating Open Limit Order for : " + parameters);
 		System.out.println(createFuturesPosition(parameters));
+		//deleteFuturesOpenOrder();
 		
 	}
 	
@@ -59,6 +60,18 @@ public class OrderManager {
 	public static String createFuturesPosition(Map<String, Object> parameters) {
 		try {
 			return client.createFutures().createFuturesPosition(parameters);
+		} catch (Exception e) {
+			System.err.println("Error in getFuturesOpenPosition: " + e.getMessage());
+			return "";
+		}
+	}
+	
+	public static String deleteFuturesOpenOrder() {
+		Map<String, Object> parameters = new HashMap<>();
+		parameters.put("symbol", "1000BONKUSDT");
+		parameters.put("orderId", "3408612660");
+		try {
+			return client.createFutures().deleteFuturesOpenOrder(parameters);
 		} catch (Exception e) {
 			System.err.println("Error in getFuturesOpenPosition: " + e.getMessage());
 			return "";

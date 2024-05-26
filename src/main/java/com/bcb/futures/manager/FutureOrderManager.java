@@ -107,10 +107,10 @@ class FutureOrderManager extends ExceptionManager {
 			throws BinanceConnectorException, BinanceClientException {
 		Map<String, Object> parameters = new HashMap<>();
 		parameters.put("symbol", coin);
-		if(coin.endsWith("USDC"))
-			parameters.put("side", CoinUtil.reverseSide(String.valueOf(parameters.get("side"))));
-		else
-			parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
+//		if(coin.endsWith("USDC"))
+//			parameters.put("side", CoinUtil.reverseSide(String.valueOf(parameters.get("side"))));
+//		else
+		parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
 		parameters.put("type", "STOP_MARKET");
 		parameters.put("quantity", String.valueOf(Math.abs(positionInfo.getPositionAmount()-CoinUtil.openOrderQuantity(coin, openOrders))));
 		parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(entryPrice, false));

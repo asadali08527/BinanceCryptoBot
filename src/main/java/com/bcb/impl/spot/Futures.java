@@ -123,7 +123,12 @@ public class Futures {
     public String getFuturesOpenOrder(Map<String, Object> parameters) {
         return requestHandler.sendSignedRequest(baseUrl, FUTURE_OPEN_ORDERS, parameters, HttpMethod.GET, showLimitUsage);
     }
-
+    
+    private final String FUTURE_OPEN_LIMIT_ORDER = "/fapi/v1/order";
+    public String deleteFuturesOpenOrder(Map<String, Object> parameters) {
+        return requestHandler.sendSignedRequest(baseUrl, FUTURE_OPEN_LIMIT_ORDER, parameters, HttpMethod.DELETE, showLimitUsage);
+    }
+    
     private final String FUTURE_WALLET_BALANCE = "/fapi/v2/balance";
     public String getFuturesWalletBalance(Map<String, Object> parameters) {
         return requestHandler.sendSignedRequest(baseUrl, FUTURE_WALLET_BALANCE, parameters, HttpMethod.GET, showLimitUsage);
