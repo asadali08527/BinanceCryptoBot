@@ -1,0 +1,42 @@
+package com.bcb.client;
+
+import java.util.ArrayList;
+
+import com.bcb.utils.websocketcallback.WebSocketClosedCallback;
+import com.bcb.utils.websocketcallback.WebSocketClosingCallback;
+import com.bcb.utils.websocketcallback.WebSocketFailureCallback;
+import com.bcb.utils.websocketcallback.WebSocketMessageCallback;
+import com.bcb.utils.websocketcallback.WebSocketOpenCallback;
+
+public interface WebSocketStreamClient {
+    int aggTradeStream(String symbol, WebSocketMessageCallback callback);
+    int aggTradeStream(String symbol, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int tradeStream(String symbol, WebSocketMessageCallback callback);
+    int tradeStream(String symbol, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int klineStream(String symbol, String interval, WebSocketMessageCallback callback);
+    int klineStream(String symbol, String interval, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int miniTickerStream(String symbol, WebSocketMessageCallback callback);
+    int miniTickerStream(String symbol, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int allMiniTickerStream(WebSocketMessageCallback callback);
+    int allMiniTickerStream(WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int symbolTicker(String symbol, WebSocketMessageCallback callback);
+    int symbolTicker(String symbol, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int allTickerStream(WebSocketMessageCallback callback);
+    int allTickerStream(WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int rollingWindowTicker(String symbol, String windowSize, WebSocketMessageCallback callback);
+    int rollingWindowTicker(String symbol, String windowSize, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int allRollingWindowTicker(String windowSize, WebSocketMessageCallback callback);
+    int allRollingWindowTicker(String windowSize, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int bookTicker(String symbol, WebSocketMessageCallback callback);
+    int bookTicker(String symbol, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int partialDepthStream(String symbol, int levels, int speed, WebSocketMessageCallback callback);
+    int partialDepthStream(String symbol, int levels, int speed, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int diffDepthStream(String symbol, int speed, WebSocketMessageCallback callback);
+    int diffDepthStream(String symbol, int speed, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int listenUserStream(String listenKey, WebSocketMessageCallback callback);
+    int listenUserStream(String listenKey, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    int combineStreams(ArrayList<String> streams, WebSocketMessageCallback callback);
+    int combineStreams(ArrayList<String> streams, WebSocketOpenCallback onOpenCallback, WebSocketMessageCallback onMessageCallback, WebSocketClosingCallback onClosingCallback, WebSocketClosedCallback onClosedCallback, WebSocketFailureCallback onFailureCallback);
+    void closeConnection(int streamId);
+    void closeAllConnections();
+}
