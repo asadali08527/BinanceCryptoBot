@@ -30,7 +30,9 @@ public class OrderManager extends ExceptionManager {
 		if(openOrderInfoList.size()!=0) {
 			Double openOrderQuantity = openOrderInfoList.stream().mapToDouble(m->Double.valueOf(m.getOrigQty())).sum();
 			Double quantity = Math.abs(positionInfo.getPositionAmount())-openOrderQuantity;
-			if(quantity>=0)
+			System.out.println("quantity : " + quantity);
+
+			if(quantity>0)
 				parameters.put("quantity", String.valueOf(quantity));
 			else {
 				return;
