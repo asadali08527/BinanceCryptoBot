@@ -8,8 +8,6 @@ import com.bcb.transfer.PositionInfo;
 import com.bcb.transfer.Sentiment;
 import com.bcb.transfer.TickerInfo;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -246,31 +244,7 @@ public class CoinUtil {
 
 	private static int getThreshold() {
 		Calendar rightNow = Calendar.getInstance();
-		int number = rightNow.get(Calendar.SECOND)%30;
+		int number = rightNow.get(Calendar.MINUTE)%6;
 		return number;
-	}
-
-	public static Double addOrReduceOneBasisPoint(Double entryPrice, boolean shouldAdd) {
-		// Convert entryPrice to BigDecimal for precision
-	    BigDecimal price = BigDecimal.valueOf(entryPrice);
-
-	    // Determine the number of decimal places
-	    int decimalPlaces = price.scale();
-
-	    // Calculate one basis point
-	    BigDecimal oneBasisPoint = BigDecimal.valueOf(1).divide(BigDecimal.TEN.pow(decimalPlaces), decimalPlaces, RoundingMode.HALF_UP);
-
-	    // Add or subtract the basis point
-	    if (shouldAdd) {
-	        price = price.add(oneBasisPoint);
-	    } else {
-	        price = price.subtract(oneBasisPoint);
-	    }
-
-	    // Return the result as a Double
-	    return price.doubleValue();
-	}
-	public static void main(String[] args) {
-		System.out.println(addOrReduceOneBasisPoint(0.301, false));
 	}
 }

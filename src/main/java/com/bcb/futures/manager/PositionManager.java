@@ -11,6 +11,7 @@ import com.bcb.exceptions.BinanceClientException;
 import com.bcb.exceptions.BinanceConnectorException;
 import com.bcb.trade.constants.Coins;
 import com.bcb.trade.util.CoinUtil;
+import com.bcb.transfer.BalanceInfo;
 import com.bcb.transfer.OpenOrderInfo;
 import com.bcb.transfer.PositionInfo;
 import com.google.gson.Gson;
@@ -56,19 +57,23 @@ public class PositionManager extends ExceptionManager {
 		if (parameters == null) {
 			return;
 		}
-
 		Double unRealizedProfit = positionInfo.getUnRealizedProfit();
-
-		if (unRealizedProfit >= 0.0) {
-			if (isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
+		if (unRealizedProfit >= 0) {
+			if (CoinUtil.isPositionAmountWithinThreshlod(positionInfo) && parameters != null) {
 				increasePositionAmount(parameters, Coins.SELL_SIDE);
 				System.out.println(POSITION_INCREASED_MESSAGE + parameters);
-			} else if (unRealizedProfit >= 0.5) {
+			} else if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo)) {
 				closeFuturePosition(coin, positionInfo);
 				//closeAndCreatePosition(coin, positionInfo, parameters, Coins.SELL_SIDE);
 				//closeAndCreatePosition(coin, positionInfo, parameters, null);
 			}
 		} else if (unRealizedProfit < 0) {
+//			Integer upMovement = null;
+//			Integer downMovement = null;
+//			Map<String, TickerInfo> tickerMap = new HashMap<>();
+//			tickerMap = MarketSentimentAnalyzer.getTickers(Coins.DESC, symbols.toArray(new String[0]));
+//			upMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_UP);
+//			downMovement = MarketSentimentAnalyzer.marketMovement(tickerMap, Coins.MOVEMENT_DOWN);
 			handleNegativeUnrealizedProfitForSellOrder(parameters, coin, positionInfo);
 		}
 	}
@@ -77,13 +82,13 @@ public class PositionManager extends ExceptionManager {
 			throws BinanceConnectorException, BinanceClientException {
 		Double unRealizedProfit = positionInfo.getUnRealizedProfit();
 
-		if (unRealizedProfit >= 1.0 && parameters != null) {
+		if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo)/2 && unRealizedProfit >= Coins.PROFIT_THRESHOLD  && parameters != null) {
 			closeAndCreatePosition(coin, positionInfo, parameters, Coins.BUY_SIDE);
 			//closeAndCreatePosition(coin, positionInfo, parameters, null);
-		} else if (unRealizedProfit >= 1.0) {
+		} else if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo) && unRealizedProfit >= Coins.PROFIT_THRESHOLD ) {
 			closeFuturePosition(coin, positionInfo);
-		} else if (!FutureOrderScheduler.pauseCreateOrders && unRealizedProfit >= 0.0
-				&& isPositionAmountLT75Cent(coin, positionInfo) && parameters != null) {
+		} else if (!FutureOrderSchedulerTAA.pauseCreateOrders 
+				&& (positionInfo.getUnRealizedProfit() >=0 || positionInfo.getUnRealizedProfit() <= -(CoinUtil.getPositionAmount(positionInfo)*10)) && CoinUtil.isPositionAmountWithinThreshlod(positionInfo) && parameters != null ) {
 			increasePositionAmount(parameters, Coins.BUY_SIDE);
 			System.out.println(POSITION_INCREASED_MESSAGE + parameters);
 		} else if (unRealizedProfit < 0) {
@@ -94,12 +99,29 @@ public class PositionManager extends ExceptionManager {
 	private void closeAndCreatePosition(String coin, PositionInfo positionInfo, Map<String, Object> parameters,
 			String side) throws BinanceConnectorException, BinanceClientException {
 		// if(FutureOrderScheduler.tickerMap.get(coin).getLastPrice()>positionInfo.getMarkPrice())
+		deleteFuturesOpenOrder(coin);
 		closeFuturePosition(coin, positionInfo);
 		if (side != null && parameters != null) {
 			takePositionByMarketPrice(parameters, side);
 		} else if( parameters != null){
 			FutureOrderManager.getInstance(this.client).createFuturePosition(parameters, 0);
 		}
+	}
+
+
+	public void deleteFuturesOpenOrder(String coin) {
+		List<OpenOrderInfo>  openOrderInfos = FutureOrderManager.getInstance(this.client).getFuturesOpenOrders(coin);
+		openOrderInfos.forEach(f->{
+			Map<String, Object> parameters = new HashMap<>();
+			parameters.put("symbol", coin);
+			parameters.put("orderId", f.getOrderId());
+			try {
+				 this.client.createFutures().deleteFuturesOpenOrder(parameters);
+			} catch (Exception e) {
+				System.err.println("Error in getFuturesOpenPosition: " + e.getMessage());
+			}
+		});
+		
 	}
 
 	private void takePositionByMarketPrice(Map<String, Object> parameters, String side)
@@ -127,7 +149,7 @@ public class PositionManager extends ExceptionManager {
 	private void handleNegativeUnrealizedProfitForSellOrder(Map<String, Object> parameters, String coin,
 			PositionInfo positionInfo) throws BinanceConnectorException, BinanceClientException {
 		if (positionInfo.getUnRealizedProfit() <= -Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD_10) {
-			System.out.println("Closing SELL order for coin " + coin + ": " + positionInfo);
+			// System.out.println("Closing SELL order for coin " + coin + ": " + positionInfo);
 			// closeFuturePosition(coin, positionInfo);
 		} else if (parameters != null && CoinUtil.getPercentageGap(positionInfo.getEntryPrice(),
 				positionInfo.getMarkPrice()) >= Coins.PRICE_CHANGE_PERCENTAGE_THRESHOLD) {
@@ -137,7 +159,7 @@ public class PositionManager extends ExceptionManager {
 
 	private void handleNegativeUnrealizedProfitForBuyOrder(Map<String, Object> parameters, String coin,
 			PositionInfo positionInfo) throws BinanceConnectorException, BinanceClientException {
-		if (!FutureOrderScheduler.pauseCreateOrders && isPositionAmountLT75Cent(coin, positionInfo)
+		if (!FutureOrderSchedulerTAA.pauseCreateOrders && CoinUtil.isPositionAmountWithinThreshlod(positionInfo) && positionInfo.getUnRealizedProfit() <= -CoinUtil.getPositionAmount(positionInfo)
 				&& parameters != null) {
 			increasePositionAmount(parameters, Coins.BUY_SIDE);
 			System.out.println("Position Increased for " + parameters);
@@ -147,11 +169,11 @@ public class PositionManager extends ExceptionManager {
 		}
 	}
 
-	private boolean isPositionAmountLT75Cent(String coin, PositionInfo positionInfo) {
-		double positionAmount = Math.abs(positionInfo.getPositionAmount()) * positionInfo.getEntryPrice()
-				/ positionInfo.getLeverage();
-		return positionAmount <= 0.75;
+	private boolean isPositionAmountLT75Cent(PositionInfo positionInfo) {
+		return CoinUtil.getPositionAmount(positionInfo)<=1.0;
 	}
+	
+	
 
 	public void closeFuturePosition(String coin, PositionInfo positionInfo)
 			throws BinanceConnectorException, BinanceClientException {

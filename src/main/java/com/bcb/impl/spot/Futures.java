@@ -128,4 +128,9 @@ public class Futures {
     public String getFuturesWalletBalance(Map<String, Object> parameters) {
         return requestHandler.sendSignedRequest(baseUrl, FUTURE_WALLET_BALANCE, parameters, HttpMethod.GET, showLimitUsage);
     }
+
+    private final String FUTURE_DELETE_ORDER = "/fapi/v1/order";
+	public String deleteFuturesOpenOrder(Map<String, Object> parameters) {
+        return requestHandler.sendSignedRequest(baseUrl, FUTURE_DELETE_ORDER, parameters, HttpMethod.DELETE, showLimitUsage);
+	}
 }
