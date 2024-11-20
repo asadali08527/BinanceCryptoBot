@@ -23,6 +23,7 @@ public class Coins {
 	public static final String ERROR_CODE_4141 = "-4141";
 	public static final String ERROR_CODE_1102 = "-1102";
 	public static final String ERROR_CODE_4014 = "-4014";
+	public static final String ERROR_CODE_2027 = "-2027";
 
 	public static final double BASE_LEVERAGE_25 = 25.0;
 	public static final double BASE_LEVERAGE_12 = 12.5;

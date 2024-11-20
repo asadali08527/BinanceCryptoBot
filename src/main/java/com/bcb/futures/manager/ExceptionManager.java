@@ -6,7 +6,6 @@ import java.util.Map;
 import com.bcb.exceptions.BinanceClientException;
 import com.bcb.exceptions.BinanceConnectorException;
 import com.bcb.trade.constants.Coins;
-import com.bcb.trade.util.CoinUtil;
 
 public class ExceptionManager {
 	private static final String PAUSING_ORDER_MESSAGE = "ReduceOnly Order is getting rejected: Pausing new orders ";
@@ -44,7 +43,10 @@ public class ExceptionManager {
         	printErrorMessage(e.getMessage(),parameters);
         } else if (Coins.ERROR_CODE_1102.equalsIgnoreCase(errorCode) || Coins.ERROR_CODE_4014.equalsIgnoreCase(errorCode)) {
         	printErrorMessage(e.getMessage(),parameters);
-        } else {
+        }else if (Coins.ERROR_CODE_2027.equalsIgnoreCase(errorCode)) {
+        	printErrorMessage(e.getMessage(),parameters);
+        }  
+        else {
         	printErrorMessage(e.getMessage(),parameters);
         }
     }

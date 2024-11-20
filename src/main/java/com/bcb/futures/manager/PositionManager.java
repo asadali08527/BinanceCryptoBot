@@ -63,6 +63,7 @@ public class PositionManager extends ExceptionManager {
 				increasePositionAmount(parameters, Coins.SELL_SIDE);
 				System.out.println(POSITION_INCREASED_MESSAGE + parameters);
 			} else if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo)) {
+				deleteFuturesOpenOrder(coin);
 				closeFuturePosition(coin, positionInfo);
 				//closeAndCreatePosition(coin, positionInfo, parameters, Coins.SELL_SIDE);
 				//closeAndCreatePosition(coin, positionInfo, parameters, null);
@@ -86,6 +87,7 @@ public class PositionManager extends ExceptionManager {
 			closeAndCreatePosition(coin, positionInfo, parameters, Coins.BUY_SIDE);
 			//closeAndCreatePosition(coin, positionInfo, parameters, null);
 		} else if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo) && unRealizedProfit >= Coins.PROFIT_THRESHOLD ) {
+			deleteFuturesOpenOrder(coin);
 			closeFuturePosition(coin, positionInfo);
 		} else if (!FutureOrderSchedulerTAA.pauseCreateOrders 
 				&& (positionInfo.getUnRealizedProfit() >=0 || positionInfo.getUnRealizedProfit() <= -(CoinUtil.getPositionAmount(positionInfo)*10)) && CoinUtil.isPositionAmountWithinThreshlod(positionInfo) && parameters != null ) {

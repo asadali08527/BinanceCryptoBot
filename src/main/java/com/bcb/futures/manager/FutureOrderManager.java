@@ -22,6 +22,7 @@ class FutureOrderManager extends ExceptionManager {
 	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
 	private static final String DOUBLING_QUANTITY_MESSAGE = "Position Retried by doubling quantity for coin ";
 	private static final String INCREASING_QUANTITY_MESSAGE = "Position Retried by increasing quantity for coin ";
+	private static final String HALVING_QUANTITY_MESSAGE = "Position Retried by halving quantity for coin ";
 
 	private static FutureOrderManager instance;
 
@@ -49,6 +50,8 @@ class FutureOrderManager extends ExceptionManager {
 			FutureOrderSchedulerTAA.processed.add(String.valueOf(parameters.get("symbol")));
 			System.out.println("Position Creation status for coin " + parameters + " Result: " + result);
 		} catch (BinanceConnectorException e) {
+			e.printStackTrace();
+			System.out.println("Issues while createting position for params: "+parameters);
 			handleConnectorException(e);
 		} catch (BinanceClientException e) {
 			String errorCode = String.valueOf(e.getErrorCode());
@@ -58,11 +61,24 @@ class FutureOrderManager extends ExceptionManager {
 				retryAndLog(parameters, retry, DOUBLING_QUANTITY_MESSAGE);
 			} else if (Coins.ERROR_CODE_4003.equalsIgnoreCase(errorCode) && retry <= 2) {
 				retryAndLog(parameters, retry, INCREASING_QUANTITY_MESSAGE);
-			} else
+			}else if (Coins.ERROR_CODE_2027.equalsIgnoreCase(errorCode) && retry <= 2) {
+				reduceQunatityAndRetry(parameters,retry,HALVING_QUANTITY_MESSAGE);
+			}
+			else
 				handleClientException(parameters, e, retry);
 		} catch (Exception e) {
 			handleGenericException(parameters, e);
 		}
+	}
+
+	private void reduceQunatityAndRetry(Map<String, Object> parameters, int retry, String logMessage) {
+		retry += 1;
+		Double quantity = Double.valueOf(String.valueOf(parameters.get("quantity")));
+		parameters.put("quantity", String.valueOf(quantity/2));	
+		parameters.remove("timestamp");
+		parameters.remove("signature");
+		createFuturePosition(parameters, retry);
+		System.out.println(logMessage + parameters);
 	}
 
 	protected void retryAndLog(Map<String, Object> parameters, int retry, String logMessage) {
