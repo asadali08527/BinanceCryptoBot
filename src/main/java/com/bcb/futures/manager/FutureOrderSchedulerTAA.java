@@ -279,9 +279,7 @@ public class FutureOrderSchedulerTAA {
 		System.out.println(
 				"**************************************************************************************************************************************************");
 		System.out.println("Cron started at " + startTime);
-		System.out.println("UpMovement : " + upMovement);
-		System.out.println("DownMovement : " + downMovement);
-
+		
 		System.out.println("Open Orders " + openOrders.size());
 		List<PositionInfo> buyPositions = CoinUtil.getOpenPositions(CoinUtil.openPosition(openPositions),
 				Coins.BUY_SIDE);
@@ -329,7 +327,7 @@ public class FutureOrderSchedulerTAA {
 			TickerInfo tickerInfo = tickerMap.get(coin);
 			System.out.println("Coin " + coin + ", : Ticker info: " + tickerInfo);
 			BalanceInfo balanceInfo = walletManager.getFutureWalletBalance("USDT");
-			System.out.println("BalanceInfo info: "+ balanceInfo.getAvailableBalance());
+			System.out.println("BalanceInfo info: " + balanceInfo.getAvailableBalance());
 			if (Arrays.asList(Coins.SKIP_USDT_LIST).contains(coin))
 				continue;
 			if (coin.endsWith("T")) {
@@ -361,7 +359,9 @@ public class FutureOrderSchedulerTAA {
 								}
 								params.put("quantity", String.valueOf(new DecimalFormat("#.##").format(quantity)));
 								orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList);
-								if (buyPositionsInProfit.size() > 3 && Double.valueOf(balanceInfo.getAvailableBalance()) >= ((quantity* tickerInfo.getLastPrice())/positionInfo.getLeverage()))
+								if (buyPositionsInProfit.size() > 3 && Double.valueOf(
+										balanceInfo.getAvailableBalance()) >= ((quantity * tickerInfo.getLastPrice())
+												/ positionInfo.getLeverage()))
 									futureOrderManager.createFuturePosition(params, 0);
 								System.out.println("Doubled Buy order for param: " + params);
 								continue;
@@ -384,28 +384,35 @@ public class FutureOrderSchedulerTAA {
 				PositionInfo usdtPositionInfo = usdtPositionInfoList.size() != 0 ? usdtPositionInfoList.get(0) : null;
 				if (usdtPositionInfo == null)
 					continue;
-				if (!openPositionExist && downMovement == 0) {
+				if (!openPositionExist || downMovement == 0) {
 					continue;
 				}
-				Integer usdcAmount = openPositionExist
-						? (int) CoinUtil.getPositionAmount(positionInfo)
-						: 0;
-				Double profitInPercentage = PositionCalculator
-						.calculatePercentageProfit(positionInfo.getUnRealizedProfit(), usdcAmount);
-				if(openPositionExist && profitInPercentage > 10.0 && Double.valueOf(balanceInfo.getAvailableBalance()) >= usdcAmount) {
-					orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList);
+				Double quantity = Double.valueOf(CoinUtil.getQuantity(coin, tickerMap.get(coin).getLastPrice()));
+				params.put("side", Coins.SELL_SIDE);
+				params.put("quantity", String.valueOf(new DecimalFormat("#.##").format(quantity)));
+				Integer usdcAmount = openPositionExist ? (int) CoinUtil.getPositionAmount(positionInfo) : 0;
+				if (usdcAmount > 0) {
+					Double profitInPercentage = PositionCalculator
+							.calculatePercentageProfit(positionInfo.getUnRealizedProfit(), usdcAmount);
+					if (openPositionExist && profitInPercentage > 25.0
+							&& (Double.valueOf(balanceInfo.getAvailableBalance())!=0.0 && Double.valueOf(balanceInfo.getAvailableBalance()) >= usdcAmount && upMovement > downMovement)) {
+						orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList);
+					}
 				}
-				if (downMovement > 2 || tickerMap.get(coin).getPriceChangePercent() < 0) {
-					params.put("side", Coins.SELL_SIDE);
-					Double quantity = Math.abs(usdtPositionInfo.getPositionAmount());
-					if (downMovement >= 5) {
+				if (downMovement > 6 || tickerMap.get(coin).getPriceChangePercent() < 0  ) //|| (Double.valueOf(balanceInfo.getAvailableBalance()) > totalSellAmount && Double.valueOf(balanceInfo.getAvailableBalance()) < totalBuyAmount)
+				{
+					if (downMovement >= 22) {
 						Integer usdtAmount = (int) CoinUtil.getPositionAmount(usdtPositionInfo);
 						if (usdtAmount >= usdcAmount) {
 							System.out.println("SELL usdtAmount: " + usdtAmount + " , usdcAmount: " + usdcAmount);
 							quantity = usdtPositionInfo.getPositionAmount()
 									- (openPositionExist ? Math.abs(positionInfo.getPositionAmount()) : 0);
 							System.out.println("SELL quantity difference: " + quantity + " Coin: " + coin);
-							if (quantity != 0.0 && Double.valueOf(balanceInfo.getAvailableBalance()) >= ((quantity* tickerInfo.getLastPrice())/positionInfo.getLeverage())) {
+							if (quantity != 0.0 && Double.valueOf(balanceInfo.getAvailableBalance()) > 0.0 && Double.valueOf(
+									balanceInfo.getAvailableBalance()) > ((quantity * tickerInfo.getLastPrice())
+											/ usdtPositionInfo.getLeverage())) {
+								if(CoinUtil.getPositionAmount(usdtPositionInfo)/2 > 65.0)
+									quantity=quantity/2;
 								params.put("quantity", String.valueOf(new DecimalFormat("#.##").format(quantity)));
 								futureOrderManager.createFuturePosition(params, 0);
 								System.out.println("Stablised SELL order for param: " + params);
@@ -413,13 +420,14 @@ public class FutureOrderSchedulerTAA {
 							continue;
 						}
 					}
+					
+
 					if (CoinUtil.getPositionAmount(usdtPositionInfo) > 65
 							&& (Arrays.asList(Coins.SKIP_USDC_LIST).contains(coin) || downMovement < upMovement)) {
 						quantity = quantity / 4;
 					} else if (downMovement < upMovement) {
 						quantity = quantity / 2;
 					}
-					params.put("quantity", String.valueOf(new DecimalFormat("#.##").format(quantity)));
 				}
 			} else {
 				continue;
@@ -428,12 +436,12 @@ public class FutureOrderSchedulerTAA {
 
 			if (!(keepEitherOpenOrderOrOpenPosition && openOrderExist)) {
 				try {
-					if (!openPositionExist && downMovement < 5) {
+					if (!openPositionExist && Double.valueOf(balanceInfo.getAvailableBalance()) > 0.0) {
 						futureOrderManager.createFuturePosition(params, 0);
-					} else if (positionInfo.getPositionAmount() < 0.0) {
+					} else if (positionInfo.getPositionAmount() < 0.0 && Double.valueOf(balanceInfo.getAvailableBalance()) > CoinUtil.getPositionAmount(positionInfo)) {
 						System.out.println("Handling Existing Sell Order : " + positionInfo);
 						positionManager.handleNegativePosition(params, coin, positionInfo);
-					} else if (positionInfo.getPositionAmount() > 0.0) {
+					} else if (positionInfo.getPositionAmount() > 0.0 && Double.valueOf(balanceInfo.getAvailableBalance()) > CoinUtil.getPositionAmount(positionInfo)) {
 						// continue;
 						System.out.println("Handling Existing Buy Order : " + positionInfo);
 						positionManager.handlePositivePosition(params, coin, positionInfo);
@@ -447,6 +455,9 @@ public class FutureOrderSchedulerTAA {
 		}
 		System.out.println(
 				"**************************************************************************************************************************************************");
+		System.out.println("UpMovement : " + upMovement);
+		System.out.println("DownMovement : " + downMovement);
+
 		printResult(new ArrayList<>(keySets), errors, errored, startTime);
 	}
 
