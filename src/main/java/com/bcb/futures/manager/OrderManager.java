@@ -24,27 +24,42 @@ public class OrderManager extends ExceptionManager {
 		this.client = client;
 	}
 
-	public void createFutureOpenOrder(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList)
-			throws BinanceConnectorException, BinanceClientException {
+	public void createFutureOpenOrder(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList,
+			PositionInfo oppositePositionInfo) throws BinanceConnectorException, BinanceClientException {
 		Map<String, Object> parameters = new HashMap<>();
-		if(openOrderInfoList.size()!=0) {
-			Double openOrderQuantity = openOrderInfoList.stream().mapToDouble(m->Double.valueOf(m.getOrigQty())).sum();
-			Double quantity = Math.abs(positionInfo.getPositionAmount())-openOrderQuantity;
-			System.out.println("quantity : " + quantity);
+		if (openOrderInfoList.size() != 0) {
+			Double openOrderQuantity = openOrderInfoList.stream().filter(f->f.getSymbol().equalsIgnoreCase(coin)).mapToDouble(m -> Double.valueOf(m.getOrigQty()))
+					.sum();
+			Double quantity = Math.abs(positionInfo.getPositionAmount()) - openOrderQuantity;
+			System.out.println("quantity diff: " + quantity+ ",  for open order coin: "+coin);
 
-			if(quantity>0)
+			if (quantity > 0) {
+				if (positionInfo.getSymbol().endsWith("T")) {
+					// Do not create an open order if the open order already present of the quantity
+					// greater or equal to opposite coin.
+					if (oppositePositionInfo!=null && positionInfo.getPositionAmount() > Math.abs(oppositePositionInfo.getPositionAmount())
+							&& openOrderQuantity >= Math.abs(oppositePositionInfo.getPositionAmount()))
+						return;
+				}
 				parameters.put("quantity", String.valueOf(quantity));
-			else {
+			} else {
 				return;
 			}
+		} else {
+			double quantity = Math.abs(positionInfo.getPositionAmount());
+			if (positionInfo.getSymbol().endsWith("T")) {
+				// Keep open order of only 50% of the quantity of opposite coin
+				if (oppositePositionInfo!=null && positionInfo.getPositionAmount() > Math.abs(oppositePositionInfo.getPositionAmount()))
+					quantity = quantity / 2;
+			}
+			parameters.put("quantity", String.valueOf(quantity));
 		}
-		else
-			parameters.put("quantity", String.valueOf(Math.abs(positionInfo.getPositionAmount())));
 		parameters.put("symbol", coin);
 		parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
 		parameters.put("type", "STOP_MARKET");
-		parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), false));		
-		//parameters.put("price", CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), false));
+		parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true));
+		// parameters.put("price",
+		// CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), false));
 		parameters.put("timeInForce", Coins.TIME_IN_FORCE);
 		parameters.put("closePosition", "false");
 		parameters.put("newOrderRespType", "ACK");
@@ -58,6 +73,8 @@ public class OrderManager extends ExceptionManager {
 		retry += 1;
 		parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(
 				Double.valueOf(CoinUtil.adjustPrecision(String.valueOf(parameters.get("stopPrice")))), false));
+//		parameters.put("quantity", String.valueOf(CoinUtil.addOrReduceOneBasisPoint(
+//				Double.valueOf(CoinUtil.adjustPrecision(String.valueOf(parameters.get("quantity")))), false)));
 		parameters.remove("timestamp");
 		parameters.remove("signature");
 		return createOrder(parameters, retry);

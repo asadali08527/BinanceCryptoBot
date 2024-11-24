@@ -83,7 +83,7 @@ public class PositionManager extends ExceptionManager {
 			throws BinanceConnectorException, BinanceClientException {
 		Double unRealizedProfit = positionInfo.getUnRealizedProfit();
 
-		if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo)/2 && unRealizedProfit >= Coins.PROFIT_THRESHOLD  && parameters != null) {
+		if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo) && unRealizedProfit >= Coins.PROFIT_THRESHOLD  && parameters != null) {
 			closeAndCreatePosition(coin, positionInfo, parameters, Coins.BUY_SIDE);
 			//closeAndCreatePosition(coin, positionInfo, parameters, null);
 		} else if (unRealizedProfit >= CoinUtil.getPositionAmount(positionInfo) && unRealizedProfit >= Coins.PROFIT_THRESHOLD ) {

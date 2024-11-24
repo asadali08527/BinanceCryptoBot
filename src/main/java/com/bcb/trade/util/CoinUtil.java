@@ -33,7 +33,7 @@ public class CoinUtil {
 	}
 
 	public static String getQuantity(String coin, Double lastPrice) {
-		double result = Coins.BASE_LEVERAGE_100 / lastPrice;
+		double result = Coins.BASE_LEVERAGE_25 / lastPrice;
 		if(Arrays.asList(Coins.FUTURE_SYMBOLS_WITH_PREFIX_1000_COIN_NAME).contains(coin))
 			result = result/1000;
 		DecimalFormat decimalFormat = null;
@@ -207,7 +207,7 @@ public class CoinUtil {
 
 	public static Map<String, List<PositionInfo>> openPosition(List<PositionInfo> openPositions) {
 		
-		Map<String, List<PositionInfo>> groupedPositions = openPositions.stream()
+		Map<String, List<PositionInfo>> groupedPositions = openPositions.stream().filter(f->f.getPositionAmount()!=0.0)
 		        .collect(Collectors.groupingBy(
 		                entry -> entry.getPositionAmount() > 0 ? Coins.BUY_SIDE : Coins.SELL_SIDE,
 		                Collectors.toList()));
@@ -240,13 +240,13 @@ public class CoinUtil {
 	}
 	
 	public static double getPositionAmount(PositionInfo positionInfo) {
-		return Math.abs(positionInfo.getPositionAmount()) * positionInfo.getEntryPrice()
-				/ positionInfo.getLeverage();
+		return positionInfo!=null ? Math.abs(positionInfo.getPositionAmount()) * positionInfo.getEntryPrice()
+				/ positionInfo.getLeverage():0.0;
 	}
 
 	private static int getThreshold() {
 		Calendar rightNow = Calendar.getInstance();
-		int number = rightNow.get(Calendar.SECOND)%30;
+		int number = rightNow.get(Calendar.SECOND)%12;
 		return number;
 	}
 
@@ -273,4 +273,13 @@ public class CoinUtil {
 	public static void main(String[] args) {
 		System.out.println(addOrReduceOneBasisPoint(0.301, false));
 	}
+
+	public static PositionInfo getPosition(List<PositionInfo> openPositions) {
+		return openPositions.size() != 0 ? openPositions.get(0) : null;
+	}
+	public static PositionInfo getOppositeCoinPosition(String coin, List<PositionInfo> openPositions) {
+	    List<PositionInfo> positionInfoList = getOpenPosition(coin, openPositions);
+	    return positionInfoList.isEmpty() ? null : positionInfoList.get(0);
+	}
+
 }
