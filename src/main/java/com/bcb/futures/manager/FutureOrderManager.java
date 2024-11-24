@@ -2,12 +2,10 @@ package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.bcb.client.SpotClient;
 import com.bcb.exceptions.BinanceClientException;
@@ -18,7 +16,7 @@ import com.bcb.transfer.OpenOrderInfo;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-class FutureOrderManager extends ExceptionManager {
+public class FutureOrderManager extends ExceptionManager {
 	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
 	private static final String DOUBLING_QUANTITY_MESSAGE = "Position Retried by doubling quantity for coin ";
 	private static final String INCREASING_QUANTITY_MESSAGE = "Position Retried by increasing quantity for coin ";
