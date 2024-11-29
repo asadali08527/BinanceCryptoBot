@@ -12,6 +12,7 @@ import com.bcb.trade.constants.Coins;
 import com.bcb.trade.util.CoinUtil;
 import com.bcb.transfer.OpenOrderInfo;
 import com.bcb.transfer.PositionInfo;
+import com.bcb.utils.PrecisionAdjuster;
 
 public class OrderManager extends ExceptionManager {
 	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
@@ -27,58 +28,96 @@ public class OrderManager extends ExceptionManager {
 	public void createFutureOpenOrder(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList,
 			PositionInfo oppositePositionInfo) throws BinanceConnectorException, BinanceClientException {
 		Map<String, Object> parameters = new HashMap<>();
-		List<OpenOrderInfo> openOrders = openOrderInfoList.stream().filter(f->f.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
-		if (openOrders.size() != 0) {
-			Double openOrderQuantity = openOrders.stream().mapToDouble(m -> Double.valueOf(m.getOrigQty()))
-					.sum();
-			Double quantity = Math.abs(positionInfo.getPositionAmount()) - Math.abs(openOrderQuantity);
-			System.out.println("quantity diff: " + quantity+ ",  for open order coin: "+coin);
+		double quantity = calculateOrderQuantity(coin, positionInfo, openOrderInfoList, oppositePositionInfo);
 
-			if (quantity >= 1) {
-				if (positionInfo.getSymbol().endsWith("T")) {
-					// Do not create an open order if the open order already present of the quantity
-					// greater or equal to opposite coin.
-					if (oppositePositionInfo!=null && positionInfo.getPositionAmount() > Math.abs(oppositePositionInfo.getPositionAmount())
-							&& openOrderQuantity >= Math.abs(oppositePositionInfo.getPositionAmount()))
-						return;
-				}
-				parameters.put("quantity",  String.format("%.2f", quantity));
-			} else {
-				return;
-			}
-		} else {
-			double quantity = Math.abs(positionInfo.getPositionAmount());
-			if (positionInfo.getSymbol().endsWith("T")) {
-				// Keep open order of only 50% of the quantity of opposite coin
-				if (oppositePositionInfo!=null && positionInfo.getPositionAmount() > Math.abs(oppositePositionInfo.getPositionAmount()))
-					quantity = quantity / 2;
-			}
-			parameters.put("quantity", String.format("%.2f", quantity));
+		if (quantity < 1) {
+			System.out.printf("Skipping order creation for coin: %s due to insufficient quantity (%.2f).%n", coin,
+					quantity);
+			return;
 		}
+
+		// Prepare order parameters
+		parameters.put("quantity", String.format("%.2f", quantity));
 		parameters.put("symbol", coin);
 		parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
 		parameters.put("type", "STOP_MARKET");
-		parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true));
-		// parameters.put("price",
-		// CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), false));
+		parameters.put("stopPrice",
+				Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(positionInfo.getEntryPrice()))));
+		// String.format("%.3f",
+		// CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true)));
 		parameters.put("timeInForce", Coins.TIME_IN_FORCE);
 		parameters.put("closePosition", "false");
 		parameters.put("newOrderRespType", "ACK");
 		parameters.put("reduceOnly", "true");
-		String result = createOrder(parameters, 0);
-		System.out.println("Open Limit Order Result : " + result);
 
+		// Execute order creation
+		String result = createOrder(parameters, 0);
+		System.out.printf("Open Limit Order Result for coin %s: %s%n", coin, result);
+	}
+
+	private double calculateOrderQuantity(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList,
+			PositionInfo oppositePositionInfo) {
+		List<OpenOrderInfo> openOrders = openOrderInfoList.stream()
+				.filter(order -> order.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
+
+		double quantity;
+
+		if (!openOrders.isEmpty()) {
+			double openOrderQuantity = openOrders.stream().mapToDouble(order -> Double.parseDouble(order.getOrigQty()))
+					.sum();
+
+			quantity = Math.abs(positionInfo.getPositionAmount()) - Math.abs(openOrderQuantity);
+			System.out.printf("Quantity difference: %.2f, for open order coin: %s%n", quantity, coin);
+
+			if (quantity < 1) {
+				return quantity; // Insufficient quantity
+			}
+
+			// Adjust quantity for coins with "T" suffix
+			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
+				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
+				if (positionInfo.getPositionAmount() > oppositePositionAmount
+						&& openOrderQuantity >= oppositePositionAmount) {
+					if (quantity <= oppositePositionAmount) {
+						return 0; // Skip order creation
+					}
+					quantity /= 2;
+				}
+			}
+		} else {
+			quantity = Math.abs(positionInfo.getPositionAmount());
+
+			// Adjust quantity for coins with "T" suffix
+			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
+				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
+				if (positionInfo.getPositionAmount() > oppositePositionAmount) {
+					quantity /= 2;
+				}
+			}
+		}
+
+		return quantity;
 	}
 
 	protected String retryAndLog(Map<String, Object> parameters, int retry, String logMessage) {
-		retry += 1;
-		parameters.put("stopPrice", CoinUtil.addOrReduceOneBasisPoint(
-				Double.valueOf(CoinUtil.adjustPrecision(String.valueOf(parameters.get("stopPrice")))), true));
-//		parameters.put("quantity", String.valueOf(CoinUtil.addOrReduceOneBasisPoint(
-//				Double.valueOf(CoinUtil.adjustPrecision(String.valueOf(parameters.get("quantity")))), false)));
+		// Adjust parameters based on the retry count
+		if (retry % 2 == 0) {
+			double stopPrice = Double.parseDouble(String.valueOf(
+					PrecisionAdjuster.adjustPrecision(Double.valueOf(String.valueOf(parameters.get("stopPrice"))))));
+			parameters.put("stopPrice", stopPrice);
+		} else {
+			parameters.put("quantity", String.valueOf((int) Double.parseDouble((String) parameters.get("quantity"))));
+		}
+
+		// Remove unnecessary parameters
 		parameters.remove("timestamp");
 		parameters.remove("signature");
-		return createOrder(parameters, retry);
+
+		// Log retry action
+		System.out.printf("Retry #%d: %s%n", retry + 1, logMessage);
+
+		// Increment retry count and create the order
+		return createOrder(parameters, retry + 1);
 	}
 
 	private String createOrder(Map<String, Object> parameters, int retry) {

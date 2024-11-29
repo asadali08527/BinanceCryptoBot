@@ -33,7 +33,7 @@ public class FutureOrderSchedulerOptimized {
 	public static void main(String[] args) {
 		// Define account configurations
 		List<AccountConfig> accountConfigs = List.of(
-				new AccountConfig(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY, PrivateConfig.BASE_URLS[0]),
+				//new AccountConfig(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY, PrivateConfig.BASE_URLS[0]),
 				new AccountConfig(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY, PrivateConfig.BASE_URLS[0])
 				);
 
