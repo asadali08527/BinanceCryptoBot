@@ -14,7 +14,7 @@ import com.bcb.transfer.BalanceInfo;
 import com.bcb.transfer.PositionInfo;
 
 public class FutureOrderSchedulerOptimized {
-	private static final int EXECUTION_INTERVAL_SECONDS = 40;
+	private static final int EXECUTION_INTERVAL_SECONDS = 20;
 
 	List<PositionInfo> openPositions = null;
 	List<PositionInfo> buyPositions = null;

@@ -31,7 +31,7 @@ public class OrderManager extends ExceptionManager {
 		double quantity = calculateOrderQuantity(coin, positionInfo, openOrderInfoList, oppositePositionInfo);
 
 		if (quantity < 1) {
-			System.out.printf("Skipping order creation for coin: %s due to insufficient quantity (%.2f).%n", coin,
+			System.out.printf("Skipping open order creation for coin: %s due to insufficient quantity (%.2f).%n", coin,
 					quantity);
 			return;
 		}
@@ -41,8 +41,9 @@ public class OrderManager extends ExceptionManager {
 		parameters.put("symbol", coin);
 		parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
 		parameters.put("type", "STOP_MARKET");
+		double stopPrice = CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true);
 		parameters.put("stopPrice",
-				Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(positionInfo.getEntryPrice()))));
+				Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(stopPrice))));
 		// String.format("%.3f",
 		// CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true)));
 		parameters.put("timeInForce", Coins.TIME_IN_FORCE);
@@ -60,7 +61,7 @@ public class OrderManager extends ExceptionManager {
 		List<OpenOrderInfo> openOrders = openOrderInfoList.stream()
 				.filter(order -> order.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
 
-		double quantity;
+		double quantity = 0;
 
 		if (!openOrders.isEmpty()) {
 			double openOrderQuantity = openOrders.stream().mapToDouble(order -> Double.parseDouble(order.getOrigQty()))
@@ -81,17 +82,17 @@ public class OrderManager extends ExceptionManager {
 					if (quantity <= oppositePositionAmount) {
 						return 0; // Skip order creation
 					}
-					quantity /= 2;
+					quantity = quantity-oppositePositionAmount;
 				}
 			}
 		} else {
-			quantity = Math.abs(positionInfo.getPositionAmount());
+			 quantity = Math.abs(positionInfo.getPositionAmount());
 
 			// Adjust quantity for coins with "T" suffix
 			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
 				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
 				if (positionInfo.getPositionAmount() > oppositePositionAmount) {
-					quantity /= 2;
+					quantity = quantity-oppositePositionAmount;
 				}
 			}
 		}
@@ -102,8 +103,9 @@ public class OrderManager extends ExceptionManager {
 	protected String retryAndLog(Map<String, Object> parameters, int retry, String logMessage) {
 		// Adjust parameters based on the retry count
 		if (retry % 2 == 0) {
+			double price = CoinUtil.addOrReduceOneBasisPoint(Double.valueOf(String.valueOf(parameters.get("stopPrice"))), true);
 			double stopPrice = Double.parseDouble(String.valueOf(
-					PrecisionAdjuster.adjustPrecision(Double.valueOf(String.valueOf(parameters.get("stopPrice"))))));
+					PrecisionAdjuster.adjustPrecision(price)));
 			parameters.put("stopPrice", stopPrice);
 		} else {
 			parameters.put("quantity", String.valueOf((int) Double.parseDouble((String) parameters.get("quantity"))));
@@ -131,7 +133,7 @@ public class OrderManager extends ExceptionManager {
 			if (Coins.ERROR_CODE_1111.equalsIgnoreCase(errorCode) && retry <= 20) {
 				return retryAndLog(parameters, retry, REDUCING_PRECISION_MESSAGE);
 			} else if (Coins.ERROR_CODE_4164.equalsIgnoreCase(errorCode) && retry <= 4) {
-				return retryAndLog(parameters, retry, DOUBLING_QUANTITY_MESSAGE);
+				return doubleQuantityAndRetry(parameters, retry, DOUBLING_QUANTITY_MESSAGE);
 			} else if (Coins.ERROR_CODE_4003.equalsIgnoreCase(errorCode) && retry <= 2) {
 				return retryAndLog(parameters, retry, INCREASING_QUANTITY_MESSAGE);
 			} else
@@ -141,7 +143,16 @@ public class OrderManager extends ExceptionManager {
 		}
 		return null;
 	}
-
+	protected String doubleQuantityAndRetry(Map<String, Object> parameters, int retry, String logMessage) {
+		retry += 1;
+		double quantity = Double.valueOf(String.valueOf(parameters.get("quantity")));
+		quantity+=1;
+		parameters.put("quantity", CoinUtil.adjustPrecision(String.valueOf(quantity)));
+		parameters.remove("timestamp");
+		parameters.remove("signature");
+		System.out.println(logMessage + parameters);
+		return createOrder(parameters, retry + 1);
+	}
 	public List<OpenOrderInfo> getOpenOrder(String coin, List<OpenOrderInfo> openOrders) {
 		List<OpenOrderInfo> openOrderInfoList = openOrders.stream().filter(f -> f.getSymbol().equalsIgnoreCase(coin))
 				.collect(Collectors.toList());

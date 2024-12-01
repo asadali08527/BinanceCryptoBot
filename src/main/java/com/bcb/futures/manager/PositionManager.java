@@ -186,6 +186,16 @@ public class PositionManager extends ExceptionManager {
 		parameters.put("quantity", String.valueOf(Math.abs(positionInfo.getPositionAmount())));
 		FutureOrderManager.getInstance(client).createFuturePosition(parameters, 0);
 	}
+	
+	public void closeFuturePosition(String coin, String side, String qunatity)
+			throws BinanceConnectorException, BinanceClientException {
+		Map<String, Object> parameters = new HashMap<>();
+		parameters.put("symbol", coin);
+		parameters.put("side", side);
+		parameters.put("type", "MARKET");
+		parameters.put("quantity", qunatity);
+		FutureOrderManager.getInstance(client).createFuturePosition(parameters, 0);
+	}
 
 	public List<PositionInfo> getOpenPosition(String coin) {
 		Map<String, Object> parameters = new HashMap<>();
