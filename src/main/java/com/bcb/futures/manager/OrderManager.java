@@ -77,11 +77,10 @@ public class OrderManager extends ExceptionManager {
 			// Adjust quantity for coins with "T" suffix
 			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
 				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
-				if (positionInfo.getPositionAmount() > oppositePositionAmount
-						&& openOrderQuantity >= oppositePositionAmount) {
-					if (quantity <= oppositePositionAmount) {
-						return 0; // Skip order creation
-					}
+				if (quantity > oppositePositionAmount) {
+//					if (quantity <= oppositePositionAmount) {
+//						return 0; // Skip order creation
+//					}
 					quantity = quantity-oppositePositionAmount;
 				}
 			}
@@ -91,7 +90,7 @@ public class OrderManager extends ExceptionManager {
 			// Adjust quantity for coins with "T" suffix
 			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
 				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
-				if (positionInfo.getPositionAmount() > oppositePositionAmount) {
+				if (quantity > oppositePositionAmount) {
 					quantity = quantity-oppositePositionAmount;
 				}
 			}
