@@ -1,17 +1,13 @@
 package com.bcb.futures.manager;
 
 import java.lang.reflect.Type;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.bcb.client.SpotClient;
 import com.bcb.transfer.BalanceInfo;
-import com.bcb.transfer.OpenOrderInfo;
 import com.bcb.utils.UrlBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;

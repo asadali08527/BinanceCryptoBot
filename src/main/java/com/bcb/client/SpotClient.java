@@ -12,6 +12,7 @@ import com.bcb.impl.spot.Margin;
 import com.bcb.impl.spot.Market;
 import com.bcb.impl.spot.Mining;
 import com.bcb.impl.spot.NFT;
+import com.bcb.impl.spot.PortfolioMarginUSDMFutures;
 import com.bcb.impl.spot.Pay;
 import com.bcb.impl.spot.PortfolioMargin;
 import com.bcb.impl.spot.Rebate;
@@ -35,6 +36,7 @@ public interface SpotClient {
     CryptoLoans createCryptoLoans();
     Fiat createFiat();
     Futures createFutures();
+    PortfolioMarginUSDMFutures createPortfolioMarginFuture();
     GiftCard createGiftCard();
     Market createMarket();
     Margin createMargin();

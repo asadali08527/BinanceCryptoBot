@@ -75,6 +75,26 @@ public class OpenOrderInfo {
     @SerializedName("updateTime")
     private long updateTime;
 
+    // Newly added fields
+    @SerializedName("newClientStrategyId")
+    private String newClientStrategyId;
+
+    @SerializedName("strategyId")
+    private long strategyId;
+
+    @SerializedName("strategyStatus")
+    private String strategyStatus;
+
+    @SerializedName("strategyType")
+    private String strategyType;
+
+    @SerializedName("triggerTime")
+    private long triggerTime;
+
+    @SerializedName("bookTime")
+    private long bookTime;
+
+    // Getters and Setters
     public long getOrderId() {
         return orderId;
     }
@@ -267,34 +287,53 @@ public class OpenOrderInfo {
         this.updateTime = updateTime;
     }
 
-    @Override
-    public String toString() {
-        return "OrderDto{" +
-                "orderId=" + orderId +
-                ", symbol='" + symbol + '\'' +
-                ", status='" + status + '\'' +
-                ", clientOrderId='" + clientOrderId + '\'' +
-                ", price='" + price + '\'' +
-                ", avgPrice='" + avgPrice + '\'' +
-                ", origQty='" + origQty + '\'' +
-                ", executedQty='" + executedQty + '\'' +
-                ", cumQuote='" + cumQuote + '\'' +
-                ", timeInForce='" + timeInForce + '\'' +
-                ", type='" + type + '\'' +
-                ", reduceOnly=" + reduceOnly +
-                ", closePosition=" + closePosition +
-                ", side='" + side + '\'' +
-                ", positionSide='" + positionSide + '\'' +
-                ", stopPrice='" + stopPrice + '\'' +
-                ", workingType='" + workingType + '\'' +
-                ", priceProtect=" + priceProtect +
-                ", origType='" + origType + '\'' +
-                ", priceMatch='" + priceMatch + '\'' +
-                ", selfTradePreventionMode='" + selfTradePreventionMode + '\'' +
-                ", goodTillDate=" + goodTillDate +
-                ", time=" + time +
-                ", updateTime=" + updateTime +
-                '}';
+    public String getNewClientStrategyId() {
+        return newClientStrategyId;
+    }
+
+    public void setNewClientStrategyId(String newClientStrategyId) {
+        this.newClientStrategyId = newClientStrategyId;
+    }
+
+    public long getStrategyId() {
+        return strategyId;
+    }
+
+    public void setStrategyId(long strategyId) {
+        this.strategyId = strategyId;
+    }
+
+    public String getStrategyStatus() {
+        return strategyStatus;
+    }
+
+    public void setStrategyStatus(String strategyStatus) {
+        this.strategyStatus = strategyStatus;
+    }
+
+    public String getStrategyType() {
+        return strategyType;
+    }
+
+    public void setStrategyType(String strategyType) {
+        this.strategyType = strategyType;
+    }
+
+    public long getTriggerTime() {
+        return triggerTime;
+    }
+
+    public void setTriggerTime(long triggerTime) {
+        this.triggerTime = triggerTime;
+    }
+
+    public long getBookTime() {
+        return bookTime;
+    }
+
+    public void setBookTime(long bookTime) {
+        this.bookTime = bookTime;
     }
 }
+
 

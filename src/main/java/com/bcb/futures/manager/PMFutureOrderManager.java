@@ -17,30 +17,30 @@ import com.bcb.transfer.Order;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-public class FutureOrderManager extends ExceptionManager {
+public class PMFutureOrderManager extends ExceptionManager {
 	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
 	private static final String DOUBLING_QUANTITY_MESSAGE = "Position Retried by doubling quantity for coin ";
 	private static final String INCREASING_QUANTITY_MESSAGE = "Position Retried by increasing quantity for coin ";
 	private static final String HALVING_QUANTITY_MESSAGE = "Position Retried by halving quantity for coin ";
 
-	private static FutureOrderManager instance;
+	private static PMFutureOrderManager instance;
 
 	private final SpotClient client;
 
-	FutureOrderManager(SpotClient client) {
+	PMFutureOrderManager(SpotClient client) {
 		this.client = client;
 	}
 
-	public static FutureOrderManager getInstance(SpotClient client) {
+	public static PMFutureOrderManager getInstance(SpotClient client) {
 		if (instance == null) {
-			instance = new FutureOrderManager(client);
+			instance = new PMFutureOrderManager(client);
 		}
 		return instance;
 	}
 
 	public void createFuturePosition(Map<String, Object> parameters, int retry) {
 		try {
-			String result = client.createFutures().createFuturesPosition(parameters);
+			String result = client.createPortfolioMarginFuture().createFuturesPosition(parameters,true);
 			Gson gson = new Gson();
 			Type orderListType = new TypeToken<OpenOrderInfo>() {
 			}.getType();
@@ -91,7 +91,7 @@ public class FutureOrderManager extends ExceptionManager {
 
 	public String getFuturesOpenOrders(Map<String, Object> parameters) {
 		try {
-			return client.createFutures().getFuturesOpenOrders(parameters);
+			return client.createPortfolioMarginFuture().getFuturesOpenOrders(parameters, true);
 		} catch (Exception e) {
 			e.printStackTrace();
 			return "";
@@ -103,7 +103,7 @@ public class FutureOrderManager extends ExceptionManager {
 		parameters.put("symbol", coin);
 		try {
 			Gson gson = new Gson();
-			String result = client.createFutures().getFuturesOpenOrders(parameters);
+			String result = client.createPortfolioMarginFuture().getFuturesOpenOrders(parameters, true);
 			Type orderListType = new TypeToken<List<OpenOrderInfo>>() {
 			}.getType();
 			return  gson.fromJson(result, orderListType);
@@ -116,7 +116,7 @@ public class FutureOrderManager extends ExceptionManager {
 	public List<OpenOrderInfo> getOpenOrders() {
 		Gson gson = new Gson();
 		Map<String, Object> parameters = new LinkedHashMap<>();
-		String result = client.createFutures().getFuturesOpenOrders(parameters);
+		String result = client.createPortfolioMarginFuture().getFuturesOpenOrders(parameters, true);
 		Type orderListType = new TypeToken<List<OpenOrderInfo>>() {
 		}.getType();
 		List<OpenOrderInfo> openOrderInfos = gson.fromJson(result, orderListType);
@@ -126,7 +126,7 @@ public class FutureOrderManager extends ExceptionManager {
 	public List<Order> getFutureAllOrders() {
 		Gson gson = new Gson();
 		Map<String, Object> parameters = new LinkedHashMap<>();
-		String result = client.createFutures().getFuturesAllOrders(parameters);
+		String result = client.createPortfolioMarginFuture().getFuturesAllOrders(parameters, true);
 		Type orderListType = new TypeToken<List<Order>>() {
 		}.getType();
 		List<Order> openOrderInfos = gson.fromJson(result, orderListType);

@@ -8,12 +8,12 @@ import java.util.concurrent.TimeUnit;
 import com.bcb.client.SpotClient;
 import com.bcb.config.AccountConfig;
 import com.bcb.config.PrivateConfig;
-import com.bcb.futures.strategy.executor.StrategyExecutor;
+import com.bcb.futures.strategy.executor.PMStrategyExecutor;
 import com.bcb.impl.SpotClientImpl;
 import com.bcb.transfer.BalanceInfo;
 import com.bcb.transfer.PositionInfo;
 
-public class FutureOrderSchedulerOptimized {
+public class PortfolioMarginFutureOrderScheduler {
 	private static final int EXECUTION_INTERVAL_SECONDS = 10;
 
 	List<PositionInfo> openPositions = null;
@@ -26,18 +26,18 @@ public class FutureOrderSchedulerOptimized {
 	Integer downMovement = 0;
 	private List<AccountConfig> accountConfigs = null;
 
-	public FutureOrderSchedulerOptimized(List<AccountConfig> accountConfigs) {
+	public PortfolioMarginFutureOrderScheduler(List<AccountConfig> accountConfigs) {
 		this.accountConfigs = accountConfigs;
 	}
 
 	public static void main(String[] args) {
 		// Define account configurations
 		List<AccountConfig> accountConfigs = List.of(
-				new AccountConfig(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY, PrivateConfig.BASE_URLS[0])
-				//new AccountConfig(PrivateConfig.TAA_PAPI_API_KEY, PrivateConfig.TAA_PAPI_SECRET_KEY, PrivateConfig.BASE_URLS[4])
+				//new AccountConfig(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY, PrivateConfig.BASE_URLS[0]),
+				new AccountConfig(PrivateConfig.TAA_PAPI_API_KEY, PrivateConfig.TAA_PAPI_SECRET_KEY, PrivateConfig.BASE_URLS[4])
 				);
 
-		FutureOrderSchedulerOptimized scheduler = new FutureOrderSchedulerOptimized(accountConfigs);
+		PortfolioMarginFutureOrderScheduler scheduler = new PortfolioMarginFutureOrderScheduler(accountConfigs);
 		ScheduledExecutorService executor = Executors.newScheduledThreadPool(accountConfigs.size());
 		executor.scheduleAtFixedRate(scheduler::executeOppositeStrategyForAllAccounts, 0, EXECUTION_INTERVAL_SECONDS,
 				TimeUnit.SECONDS);
@@ -52,13 +52,13 @@ public class FutureOrderSchedulerOptimized {
 	private void executeStrategyForAccount(AccountConfig accountConfig) {
 		SpotClient client = new SpotClientImpl(accountConfig.getApiKey(), accountConfig.getSecretKey(),
 				accountConfig.getBaseUrl());
-		PositionManager positionManager = new PositionManager(client);
-		FutureOrderManager futureOrderManager = new FutureOrderManager(client);
-		WalletManager walletManager = new WalletManager(client);
-		OrderManager orderManager = new OrderManager(client);
+		PMPositionManager positionManager = new PMPositionManager(client);
+		PMFutureOrderManager futureOrderManager = new PMFutureOrderManager(client);
+		PMWalletManager walletManager = new PMWalletManager(client);
+		PMOrderManager orderManager = new PMOrderManager(client);
 
 		// Use these managers to execute the strategy for this account
-		StrategyExecutor strategyExecutor = new StrategyExecutor(positionManager, futureOrderManager, walletManager,
+		PMStrategyExecutor strategyExecutor = new PMStrategyExecutor(positionManager, futureOrderManager, walletManager,
 				orderManager);
 		strategyExecutor.executeStrategy();
 	}

@@ -13,6 +13,7 @@ import com.bcb.impl.spot.Margin;
 import com.bcb.impl.spot.Market;
 import com.bcb.impl.spot.Mining;
 import com.bcb.impl.spot.NFT;
+import com.bcb.impl.spot.PortfolioMarginUSDMFutures;
 import com.bcb.impl.spot.Pay;
 import com.bcb.impl.spot.PortfolioMargin;
 import com.bcb.impl.spot.Rebate;
@@ -109,6 +110,11 @@ public class SpotClientImpl implements SpotClient {
     @Override
     public Futures createFutures() {
         return new Futures(baseUrl, apiKey, signatureGenerator, showLimitUsage, proxy);
+    }
+    
+    @Override
+    public PortfolioMarginUSDMFutures createPortfolioMarginFuture() {
+        return new PortfolioMarginUSDMFutures(baseUrl, apiKey, signatureGenerator, showLimitUsage, proxy);
     }
 
     @Override

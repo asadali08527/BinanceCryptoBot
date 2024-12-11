@@ -14,14 +14,14 @@ import com.bcb.transfer.OpenOrderInfo;
 import com.bcb.transfer.PositionInfo;
 import com.bcb.utils.PrecisionAdjuster;
 
-public class OrderManager extends ExceptionManager {
+public class PMOrderManager extends ExceptionManager {
 	private static final String REDUCING_PRECISION_MESSAGE = "Position Retried by reducing precision for coin ";
 	private static final String DOUBLING_QUANTITY_MESSAGE = "Position Retried by doubling quantity for coin ";
 	private static final String INCREASING_QUANTITY_MESSAGE = "Position Retried by increasing quantity for coin ";
 
 	private final SpotClient client;
 
-	public OrderManager(SpotClient client) {
+	public PMOrderManager(SpotClient client) {
 		this.client = client;
 	}
 
@@ -40,19 +40,20 @@ public class OrderManager extends ExceptionManager {
 		parameters.put("quantity", String.format("%.2f", quantity));
 		parameters.put("symbol", coin);
 		parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
-		parameters.put("type", "STOP_MARKET");
+		//parameters.put("type", "STOP_MARKET");
+		parameters.put("strategyType", "STOP_MARKET");
 		double stopPrice = CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true);
 		parameters.put("stopPrice",
-				Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(stopPrice))));
+				String.valueOf(PrecisionAdjuster.adjustPrecision(stopPrice)));
 		// String.format("%.3f",
 		// CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true)));
 		parameters.put("timeInForce", Coins.TIME_IN_FORCE);
-		parameters.put("closePosition", "false");
-		parameters.put("newOrderRespType", "ACK");
-		parameters.put("reduceOnly", "true");
+		//parameters.put("closePosition", "false");
+		//parameters.put("newOrderRespType", "ACK");
+		//parameters.put("reduceOnly", "true");
 
 		// Execute order creation
-		String result = createOrder(parameters, 0);
+		String result = createLimitOrder(parameters, 0);
 		System.out.printf("Open Limit Order Result for coin %s: %s%n", coin, result);
 	}
 
@@ -105,7 +106,7 @@ public class OrderManager extends ExceptionManager {
 			double price = CoinUtil.addOrReduceOneBasisPoint(Double.valueOf(String.valueOf(parameters.get("stopPrice"))), true);
 			double stopPrice = Double.parseDouble(String.valueOf(
 					PrecisionAdjuster.adjustPrecision(price)));
-			parameters.put("stopPrice", stopPrice);
+			parameters.put("stopPrice", String.valueOf(stopPrice));
 		} else {
 			parameters.put("quantity", String.valueOf((int) Double.parseDouble((String) parameters.get("quantity"))));
 		}
@@ -118,13 +119,13 @@ public class OrderManager extends ExceptionManager {
 		System.out.printf("Retry #%d: %s%n", retry + 1, logMessage);
 
 		// Increment retry count and create the order
-		return createOrder(parameters, retry + 1);
+		return createLimitOrder(parameters, retry + 1);
 	}
 
-	private String createOrder(Map<String, Object> parameters, int retry) {
+	private String createLimitOrder(Map<String, Object> parameters, int retry) {
 		System.out.println("Creating Open Limit Order for : " + parameters);
 		try {
-			return client.createFutures().createFuturesPosition(parameters);
+			return client.createPortfolioMarginFuture().createLimitOrder(parameters,true);
 		} catch (BinanceConnectorException e) {
 			handleConnectorException(e);
 		} catch (BinanceClientException e) {
@@ -150,12 +151,14 @@ public class OrderManager extends ExceptionManager {
 		parameters.remove("timestamp");
 		parameters.remove("signature");
 		System.out.println(logMessage + parameters);
-		return createOrder(parameters, retry + 1);
+		return createLimitOrder(parameters, retry + 1);
 	}
 	public List<OpenOrderInfo> getOpenOrder(String coin, List<OpenOrderInfo> openOrders) {
 		List<OpenOrderInfo> openOrderInfoList = openOrders.stream().filter(f -> f.getSymbol().equalsIgnoreCase(coin))
 				.collect(Collectors.toList());
 		return openOrderInfoList;
 	}
+
+	
 
 }
