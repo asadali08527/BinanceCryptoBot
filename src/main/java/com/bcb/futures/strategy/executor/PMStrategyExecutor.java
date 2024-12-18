@@ -77,7 +77,7 @@ public class PMStrategyExecutor {
 		System.out.printf("BalanceInfo: %s, UpMovement: %d, DownMovement: %d%n", balanceInfo.getTotalAvailableBalance(),
 				upMovement, downMovement);
 		System.out.println("****************************************************************************************");
-		//processBuyPositions(tickerMap, openOrders);
+		processBuyPositions(tickerMap, openOrders);
 		processSellPositions(tickerMap, openOrders);
 		//processCoinMPositions(tickerMap);
 
@@ -226,8 +226,10 @@ public class PMStrategyExecutor {
 		double usdtPositionAmount = positionInfo.getPositionAmount();
 
 		// Handle stabilization for mismatched positions
-		if (usdcPositionAmount > usdtPositionAmount) {
-			stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo, usdcPositionAmount, usdtPositionAmount);
+		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)) {
+			//stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo,
+			//usdcPositionAmount, usdtPositionAmount);
+			return;
 		}
 	}
 
@@ -311,8 +313,8 @@ public class PMStrategyExecutor {
 		double usdtPositionAmount = positionInfo.getPositionAmount();
 
 		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)) {
-			// stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo,
-			// usdcPositionAmount, usdtPositionAmount);
+			//stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo,
+			//usdcPositionAmount, usdtPositionAmount);
 			return;
 		}
 
@@ -629,7 +631,7 @@ public class PMStrategyExecutor {
 
 	private boolean isBalanceSufficient(Double usdcAmount, Double usdtAmount, double buyAmount,
 			double availableBalance) {
-		double thresholdMultiplier = 10 * 2 * 11; // Avoiding magic numbers
+		double thresholdMultiplier = 10 * 2 * 22; // Avoiding magic numbers
 		return usdcAmount * thresholdMultiplier < availableBalance
 				&& usdtAmount * thresholdMultiplier < availableBalance
 				&& buyAmount * thresholdMultiplier < availableBalance;
@@ -771,7 +773,7 @@ public class PMStrategyExecutor {
 			List<OpenOrderInfo> openOrders, PositionInfo usdtPositionInfo) {
 		double profitInPercentage = PositionCalculator.calculatePercentageProfit(positionInfo.getUnRealizedProfit(),
 				usdcAmount);
-		boolean hasSufficientBalance = Double.valueOf(balanceInfo.getTotalAvailableBalance()) >= usdcAmount * 22 * 2;
+		boolean hasSufficientBalance = Double.valueOf(balanceInfo.getTotalAvailableBalance()) >= usdcAmount * 22 * 2 * 10;
 		boolean isMarketFavorable = upMovement > downMovement * 6;
 
 		if (profitInPercentage > 100.0 && hasSufficientBalance) {
@@ -796,11 +798,11 @@ public class PMStrategyExecutor {
 
 		logPositionAmounts(usdtPositionAmount, usdcPositionAmount);
 
-		if (isDownMovementInRange(12, 18)) {
+		if (isDownMovementInRange(22, 28)) {
 			return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 4);
-		} else if (isDownMovementInRange(18, 22)) {
+		} else if (isDownMovementInRange(28, 34)) {
 			return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 2);
-		} else if (downMovement > 22) {
+		} else if (downMovement > 34) {
 			return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo);
 		}
 

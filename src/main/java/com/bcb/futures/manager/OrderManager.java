@@ -30,7 +30,7 @@ public class OrderManager extends ExceptionManager {
 		Map<String, Object> parameters = new HashMap<>();
 		double quantity = calculateOrderQuantity(coin, positionInfo, openOrderInfoList, oppositePositionInfo);
 
-		if (quantity < 0.5) {
+		if (quantity < 0.1) {
 			System.out.printf("Skipping open order creation for coin: %s due to insufficient quantity (%.2f).%n", coin,
 					quantity);
 			return;
@@ -107,7 +107,7 @@ public class OrderManager extends ExceptionManager {
 					PrecisionAdjuster.adjustPrecision(price)));
 			parameters.put("stopPrice", stopPrice);
 		} else {
-			parameters.put("quantity", String.valueOf((int) Double.parseDouble((String) parameters.get("quantity"))));
+			parameters.put("quantity", String.valueOf(Double.parseDouble((String) parameters.get("quantity"))));
 		}
 
 		// Remove unnecessary parameters
