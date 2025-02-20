@@ -4,35 +4,32 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.bcb.enums.MarketType;
-import com.bcb.futures.manager.PMFutureOrderManager;
-import com.bcb.futures.manager.PMOrderManager;
-import com.bcb.futures.manager.PMPositionManager;
-import com.bcb.futures.manager.PMWalletManager;
+import com.bcb.futures.manager.FutureOrderManager;
+import com.bcb.futures.manager.OrderManager;
+import com.bcb.futures.manager.PositionManager;
+import com.bcb.futures.manager.WalletManager;
 import com.bcb.trade.constants.Coins;
 import com.bcb.trade.sentiment.MarketSentimentAnalyzer;
 import com.bcb.trade.util.CoinUtil;
 import com.bcb.trade.util.PositionCalculator;
-import com.bcb.transfer.AccountInfo;
+import com.bcb.transfer.BalanceInfo;
 import com.bcb.transfer.OpenOrderInfo;
-import com.bcb.transfer.Order;
 import com.bcb.transfer.PositionInfo;
 import com.bcb.transfer.TickerInfo;
 
-public class PMStrategyExecutor {
+public class StrategyExecutorV2 {
 	private static final String CRON_FINISHED_MESSAGE = "Cron Finished at ";
 	private static final String TOTAL_TIME_MESSAGE = "Total Time taken to Execute The Job : ";
 
-	private final PMPositionManager positionManager;
-	private final PMFutureOrderManager futureOrderManager;
-	private final PMWalletManager walletManager;
-	private final PMOrderManager orderManager;
+	private final PositionManager positionManager;
+	private final FutureOrderManager futureOrderManager;
+	private final WalletManager walletManager;
+	private final OrderManager orderManager;
 
 	private static List<String> processed = new ArrayList<>();
 	private static List<String> errored = new ArrayList<>();
@@ -41,19 +38,18 @@ public class PMStrategyExecutor {
 	List<PositionInfo> openPositions = null;
 	List<PositionInfo> buyPositions = null;
 	List<PositionInfo> sellPositions = null;
-	List<OpenOrderInfo> openOrders = null;
-	AccountInfo balanceInfo = null;
-	private Set<String> symbols = new HashSet();
+	BalanceInfo balanceInfo = null;
+	private List<String> symbols = new ArrayList<>();
 	List<PositionInfo> buyPositionsInProfit = null;
 	Integer upMovement = 0;
 	Integer downMovement = 0;
 
-	public PMStrategyExecutor(PMPositionManager positionManager2, PMFutureOrderManager futureOrderManager2,
-			PMWalletManager walletManager2, PMOrderManager orderManager2) {
-		this.positionManager = positionManager2;
-		this.futureOrderManager = futureOrderManager2;
-		this.walletManager = walletManager2;
-		this.orderManager = orderManager2;
+	public StrategyExecutorV2(PositionManager positionManager, FutureOrderManager futureOrderManager,
+			WalletManager walletManager, OrderManager orderManager) {
+		this.positionManager = positionManager;
+		this.futureOrderManager = futureOrderManager;
+		this.walletManager = walletManager;
+		this.orderManager = orderManager;
 	}
 
 	public void executeStrategy() {
@@ -67,26 +63,20 @@ public class PMStrategyExecutor {
 		initializePositionData();
 
 		Map<String, TickerInfo> tickerMap = initializeTickerMap();
-		buyPositionsInProfit = getProfitablePositions(buyPositions);
+		List<OpenOrderInfo> openOrders = futureOrderManager.getOpenOrders();
 
 		printPositionSummary(buyPositionsInProfit);
 
 		calculateMarketMovement(tickerMap);
 
-		balanceInfo = walletManager.getAccountInfo();
-		System.out.printf("BalanceInfo: %s, UpMovement: %d, DownMovement: %d%n", balanceInfo.getTotalAvailableBalance(),
+		balanceInfo = walletManager.getFutureWalletBalance("USDT");
+		System.out.printf("BalanceInfo: %s, UpMovement: %d, DownMovement: %d%n", balanceInfo.getAvailableBalance(),
 				upMovement, downMovement);
 		System.out.println("****************************************************************************************");
 		processBuyPositions(tickerMap, openOrders);
 		processSellPositions(tickerMap, openOrders);
-		//processCoinMPositions(tickerMap);
 
 		printResult(new ArrayList<>(tickerMap.keySet()), new ArrayList<>(), errored, startTime);
-	}
-
-	private void processCoinMPositions(Map<String, TickerInfo> tickerMap) {
-		List<PositionInfo> coinMOpenOrder = positionManager.getCoinMOpenPositions("cm");
-		coinMOpenOrder.forEach(System.out::println);		
 	}
 
 	private boolean isJobPaused() {
@@ -103,25 +93,22 @@ public class PMStrategyExecutor {
 
 	private void initializePositionData() {
 		symbols.clear();
-		openOrders = futureOrderManager.getOpenOrders().stream()
-				.filter(f -> "NEW".equalsIgnoreCase(f.getStrategyStatus())).collect(Collectors.toList());
-		// List<Order> orders = futureOrderManager.getFutureAllOrders();
 		openPositions = positionManager.getAllOpenPositions();
-//		Set<String> usdcSymbols = orders.stream().filter(position -> {
-//			return position.getSymbol().endsWith("C") ;
-//		}).map(m -> {
-//			return m.getSymbol();
-//		}).collect(Collectors.toSet());
-//		List<String> usdtSymbols = usdcSymbols.stream().map(symbol -> {
-//			return symbol.replace("USDC", "USDT");
-//		}).collect(Collectors.toList());
-//		openPositions = openPositions.stream().filter(position -> {
-//			return (usdtSymbols.contains(position.getSymbol()) || position.getSymbol().endsWith("USDC"))
-//					&& !position.getSymbol().startsWith("1000");
-//		}).collect(Collectors.toList());
-//		openPositions = openPositions.stream().filter(f -> f.getPositionAmount() != 0.0).collect(Collectors.toList());
-		symbols.addAll(Arrays.asList(Coins.FUTURE_OPPOSITE_COINS));
-
+		List<String> usdcSymbols = openPositions.stream().filter(position -> {
+			return position.getSymbol().endsWith("USDC") && !position.getSymbol().startsWith("1000");
+		}).map(m -> {
+			return m.getSymbol();
+		}).collect(Collectors.toList());
+		List<String> usdtSymbols = usdcSymbols.stream().map(symbol -> {
+			return symbol.replace("USDC", "USDT");
+		}).collect(Collectors.toList());
+		openPositions = openPositions.stream().filter(position -> {
+			return (usdtSymbols.contains(position.getSymbol()) || position.getSymbol().endsWith("USDC"))
+					&& !position.getSymbol().startsWith("1000");
+		}).collect(Collectors.toList());
+		openPositions = openPositions.stream().filter(f -> f.getPositionAmount() != 0.0).collect(Collectors.toList());
+		symbols.addAll(usdcSymbols);
+		symbols.addAll(usdtSymbols);
 		buyPositions = CoinUtil.getOpenPositions(CoinUtil.openPosition(openPositions), Coins.BUY_SIDE);
 		sellPositions = CoinUtil.getOpenPositions(CoinUtil.openPosition(openPositions), Coins.SELL_SIDE);
 
@@ -130,7 +117,7 @@ public class PMStrategyExecutor {
 		System.out.println("****************************************************************************************");
 		System.out.println("Buy Amount: " + totalBuyAmount);
 		System.out.println("Sell Amount: " + totalSellAmount);
-
+		buyPositionsInProfit = getProfitablePositions(buyPositions);
 		int buyAggLeverage = calculateAggregateLeverage(buyPositions);
 		int sellAggLeverage = calculateAggregateLeverage(sellPositions);
 		System.out.println("Buy Positions Aggregiate Levarage: " + buyAggLeverage);
@@ -156,12 +143,12 @@ public class PMStrategyExecutor {
 	}
 
 	private Map<String, TickerInfo> initializeTickerMap() {
-		return MarketSentimentAnalyzer.getTickers(Coins.DESC, symbols.toArray(new String[0]));
+		return MarketSentimentAnalyzer.getTickers(Coins.ALT, symbols.toArray(new String[0]));
 	}
 
 	private void processBuyPositions(Map<String, TickerInfo> tickerMap, List<OpenOrderInfo> openOrders) {
 		// Fetch wallet balance for USDT
-		balanceInfo = walletManager.getAccountInfo();
+		balanceInfo = walletManager.getFutureWalletBalance("USDT");
 
 		for (Map.Entry<String, TickerInfo> entry : tickerMap.entrySet()) {
 			String coin = entry.getKey();
@@ -205,17 +192,7 @@ public class PMStrategyExecutor {
 			List<OpenOrderInfo> openOrders) {
 		if (isProfitablePosition(positionInfo)) {
 			handleProfitableBuy(positionInfo, tickerInfo, openOrders);
-			return;
-		} else if (isLossGT1000(positionInfo)) {
-			createMinimumBuyPosition(positionInfo, tickerInfo);
-			return;
 		}
-
-		handleMismatchedBuyPosition(positionInfo, tickerInfo);
-	}
-
-	private boolean isLossGT1000(PositionInfo positionInfo) {
-		return positionInfo != null && positionInfo.getUnRealizedProfit() <= -1000;
 	}
 
 	private void handleMismatchedBuyPosition(PositionInfo positionInfo, TickerInfo tickerInfo) {
@@ -226,17 +203,23 @@ public class PMStrategyExecutor {
 		double usdtPositionAmount = positionInfo.getPositionAmount();
 
 		// Handle stabilization for mismatched positions
-		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)) {
-			//stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo,
-			//usdcPositionAmount, usdtPositionAmount);
-			return;
+		if (usdcPositionAmount > usdtPositionAmount && positionInfo.getUnRealizedProfit() > 0) {
+			stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo, usdcPositionAmount, usdtPositionAmount);
 		}
 	}
 
 	private void processNewBuyPosition(String coin, TickerInfo tickerInfo) {
-		if (downMovement <= 8) {// && ((buyPositions.size() >= 21 && buyPositionsInProfit.size() >= 11) ||
-								// buyPositions.size() < 11)
+		if (downMovement <= Coins.INITIAL_SELL_ORDER_THRESHOLD
+				&& ((buyPositions.size() >= 12 && buyPositionsInProfit.size() >= Coins.BUY_ORDER_IN_PROFIT_COUNT)
+						|| buyPositions.size() < 12)) {
 			createNewBuyPosition(coin, tickerInfo);
+		} else if (downMovement <= Coins.INITIAL_SELL_ORDER_THRESHOLD) {
+			// Get USDC equivalent coin and associated position info if it is not there
+			String usdcCoin = coin.replace("USDT", "USDC");
+			PositionInfo usdcPositionInfo = getUsdcPositionInfo(usdcCoin);
+			if (usdcPositionInfo != null) {
+				createNewBuyPosition(coin, tickerInfo);
+			}
 		}
 	}
 
@@ -256,6 +239,7 @@ public class PMStrategyExecutor {
 		double usdtAmount = CoinUtil.getPositionAmount(positionInfo);
 		double profitPercentage = PositionCalculator.calculatePercentageProfit(positionInfo.getUnRealizedProfit(),
 				usdtAmount);
+		System.out.println("Coin: " + positionInfo.getSymbol() + " , Profit %: " + profitPercentage);
 
 		PositionInfo usdcPositionInfo = getUsdcPositionInfo(usdcCoin);
 		double usdcAmount = usdcPositionInfo != null ? CoinUtil.getPositionAmount(usdcPositionInfo) : 0;
@@ -276,7 +260,7 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean isBelowMinimumUsdtAmount(double usdtAmount) {
-		return usdtAmount <= 1.0;
+		return usdtAmount <= 1;
 	}
 
 	private PositionInfo getUsdcPositionInfo(String usdcCoin) {
@@ -289,12 +273,13 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean shouldSkipProcessing(double profitPercentage) {
-		return downMovement > 6 || profitPercentage < 1;
+		return downMovement > Coins.INITIAL_SELL_ORDER_THRESHOLD || profitPercentage < 5;
 	}
 
 	private void createMinimumBuyPosition(PositionInfo positionInfo, TickerInfo tickerInfo) {
 		Map<String, Object> params = createOrderParams(positionInfo.getSymbol(), Coins.BUY_SIDE, tickerInfo);
-		params.put("quantity", String.valueOf(Math.abs(positionInfo.getPositionAmount())));
+		// params.put("quantity",
+		// String.valueOf(Math.abs(positionInfo.getPositionAmount())));
 		futureOrderManager.createFuturePosition(params, 0);
 		System.out.println("Made buy position for at least USDT 1.0 or more for params: " + params);
 	}
@@ -302,19 +287,18 @@ public class PMStrategyExecutor {
 	private void processHighlyProfitablePosition(PositionInfo positionInfo, TickerInfo tickerInfo,
 			List<OpenOrderInfo> openOrders, PositionInfo usdcPositionInfo, double profitPercentage, double usdcAmount,
 			double usdtAmount) {
-		if (profitPercentage <= 25) {
-			return; // Exit early if profit percentage is not high enough
-		}
-
-		// handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo,
-		// profitPercentage, usdtAmount);
-
 		double usdcPositionAmount = usdcPositionInfo != null ? Math.abs(usdcPositionInfo.getPositionAmount()) : 0;
 		double usdtPositionAmount = positionInfo.getPositionAmount();
 
-		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)) {
-			//stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo,
-			//usdcPositionAmount, usdtPositionAmount);
+		if (profitPercentage <= 50) {
+			return; // Exit early if profit percentage is not high enough
+		}
+
+		handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount);
+
+		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)
+				&& CoinUtil.openOrderExist(positionInfo.getSymbol(), openOrders)) {//
+			stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo, usdcPositionAmount, usdtPositionAmount);
 			return;
 		}
 
@@ -323,10 +307,12 @@ public class PMStrategyExecutor {
 
 	private void handleFutureOpenOrder(PositionInfo positionInfo, TickerInfo tickerInfo, List<OpenOrderInfo> openOrders,
 			PositionInfo usdcPositionInfo, double profitPercentage, double usdtAmount) {
-		boolean hasNoOpenOrders = orderManager.getOpenOrder(positionInfo.getSymbol(), openOrders).isEmpty();
-		boolean shouldCreateOrder = profitPercentage >= 33 && !hasNoOpenOrders;
-
-		if (usdtAmount > 1.0 && (hasNoOpenOrders || shouldCreateOrder)) {
+		// boolean hasNoOpenOrders = orderManager.getOpenOrder(positionInfo.getSymbol(),
+		// openOrders).isEmpty();
+		// boolean shouldCreateOrder = profitPercentage >= 25 && !hasNoOpenOrders;
+//		if (Arrays.asList(Coins.SKIP_USDT_LIST).contains(positionInfo.getSymbol()))
+//			return;
+		if (usdtAmount > 1.0) {// && (hasNoOpenOrders || shouldCreateOrder)
 			orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo);
 		}
 	}
@@ -338,9 +324,11 @@ public class PMStrategyExecutor {
 	private void handleProfitScenarios(PositionInfo positionInfo, TickerInfo tickerInfo, PositionInfo usdcPositionInfo,
 			double profitPercentage, double usdcAmount, double usdtAmount) {
 		if (isModerateProfit(profitPercentage, usdtAmount)) {
-			// createMinimumBuyPosition(positionInfo, tickerInfo);
+			createMinimumBuyPosition(positionInfo, tickerInfo);
 		} else if (isHighProfit(profitPercentage)) {
-			// closeHighlyProfitablePosition(positionInfo, usdcPositionInfo);
+			if (Arrays.asList(Coins.SKIP_USDT_LIST).contains(positionInfo.getSymbol()))
+				return;
+			closeHighlyProfitablePosition(positionInfo, usdcPositionInfo);
 		} else if (isBetweenModerateAndHighProfit(profitPercentage)
 				&& isUsdcPositionHigherOrEqual(usdcPositionInfo, positionInfo, usdcAmount, usdtAmount)) {
 			handleNewBuyOrderEquivalentToOppositePosition(positionInfo, tickerInfo, usdcPositionInfo);
@@ -348,15 +336,15 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean isModerateProfit(double profitPercentage, double usdtAmount) {
-		return profitPercentage > 50 && profitPercentage <= 66 && usdtAmount < 2;
+		return profitPercentage > 150 && profitPercentage < 200 && usdtAmount < Coins.MAX_BUY_USDT_AMOUNT;
 	}
 
 	private boolean isHighProfit(double profitPercentage) {
-		return profitPercentage >= 75;
+		return profitPercentage >= 550;
 	}
 
 	private boolean isBetweenModerateAndHighProfit(double profitPercentage) {
-		return profitPercentage > 66 && profitPercentage < 75;
+		return profitPercentage > 0 && profitPercentage < 150;
 	}
 
 	private void stabilizeBuyPosition(PositionInfo positionInfo, TickerInfo tickerInfo, PositionInfo usdcPositionInfo,
@@ -488,14 +476,14 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean canCreateBuyOrder(double usdtAmount, double totalPositionAmount) {
-		double availableBalance = Double.valueOf(balanceInfo.getTotalAvailableBalance());
+		double availableBalance = Double.valueOf(balanceInfo.getAvailableBalance());
 		int maxUsdtAmountDigits = calculateMaxUsdtAmountDigits(availableBalance);
 		double maxUsdtAmount = calculateMaxUsdtAmount(maxUsdtAmountDigits);
 
 		boolean isUsdtAmountConditionMet = usdtAmount > 0 && usdtAmount <= maxUsdtAmount
 				&& totalPositionAmount <= maxUsdtAmount;
 
-		return buyPositionsInProfit.size() >= 6 && availableBalance >= usdtAmount * 10 * 2 * 22
+		return buyPositionsInProfit.size() >= 6 && availableBalance >= usdtAmount * Coins.MULTIPLIER_LEVERAGE
 				&& isUsdtAmountConditionMet;
 	}
 
@@ -520,7 +508,8 @@ public class PMStrategyExecutor {
 		}
 
 		Double quantity = Math.abs(usdcPositionInfo.getPositionAmount());
-		if (CoinUtil.getPositionAmount(usdcPositionInfo) <= 1 && buyPositionsInProfit.size() > 6) {
+		if (CoinUtil.getPositionAmount(usdcPositionInfo) <= 1
+				&& buyPositionsInProfit.size() > Coins.BUY_ORDER_IN_PROFIT_COUNT) {
 			quantity *= 2;
 		}
 		return quantity;
@@ -550,6 +539,7 @@ public class PMStrategyExecutor {
 		// Execute the Buy order based on conditions
 		if (canCreateBuyOrder(usdcPositionInfo, buyAmount, usdcAmount, usdtAmount)) {
 			futureOrderManager.createFuturePosition(params, 0);
+			initializePositionData();
 			System.out.println("Created new Buy order for coin: " + coin + " with quantity: " + quantity);
 		} else {
 			System.out.println("Conditions not met for Buy order for coin: " + coin);
@@ -572,7 +562,7 @@ public class PMStrategyExecutor {
 
 	private boolean canCreateBuyOrder(PositionInfo usdcPositionInfo, double buyAmount, Double usdcAmount,
 			Double usdtAmount) {
-		double availableBalance = Double.valueOf(balanceInfo.getTotalAvailableBalance());
+		double availableBalance = Double.valueOf(balanceInfo.getAvailableBalance());
 		if (usdcPositionInfo != null && availableBalance > buyAmount) {
 			return true;
 		}
@@ -598,7 +588,7 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean shouldCreateBuyOrder(Double usdcAmount, Double usdtAmount, double buyAmount) {
-		double availableBalance = Double.valueOf(balanceInfo.getTotalAvailableBalance());
+		double availableBalance = Double.valueOf(balanceInfo.getAvailableBalance());
 		int availableBalanceDigits = calculateNumberOfDigits(availableBalance);
 		double maxUsdtAmount = calculateMaxUsdtAmount(availableBalanceDigits);
 
@@ -626,12 +616,13 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean isBuyPositionLimitMet() {
-		return (buyPositions.size() < 12 || (buyPositions.size() >= 12 && buyPositionsInProfit.size() > 6));
+		return (buyPositions.size() < Coins.MAX_BUY_ORDER || (buyPositions.size() >= Coins.MAX_BUY_ORDER
+				&& buyPositionsInProfit.size() >= Coins.BUY_ORDER_IN_PROFIT_COUNT));
 	}
 
 	private boolean isBalanceSufficient(Double usdcAmount, Double usdtAmount, double buyAmount,
 			double availableBalance) {
-		double thresholdMultiplier = 10 * 2 * 22; // Avoiding magic numbers
+		double thresholdMultiplier = Coins.MULTIPLIER_LEVERAGE; // Avoiding magic numbers
 		return usdcAmount * thresholdMultiplier < availableBalance
 				&& usdtAmount * thresholdMultiplier < availableBalance
 				&& buyAmount * thresholdMultiplier < availableBalance;
@@ -654,7 +645,7 @@ public class PMStrategyExecutor {
 	}
 
 	private void processSellPositions(Map<String, TickerInfo> tickerMap, List<OpenOrderInfo> openOrders) {
-		balanceInfo = walletManager.getAccountInfo();
+		balanceInfo = walletManager.getFutureWalletBalance("USDT");
 
 		for (Map.Entry<String, TickerInfo> entry : tickerMap.entrySet()) {
 			String usdcCoin = entry.getKey();
@@ -720,25 +711,26 @@ public class PMStrategyExecutor {
 
 	private void adjustQuantityBasedOnDownMovement(String coin, PositionInfo positionInfo, TickerInfo tickerInfo,
 			PositionInfo usdtPositionInfo, List<OpenOrderInfo> openOrders) {
-		// double baseQuantity = Double.valueOf(CoinUtil.getQuantity(coin,
-		// tickerInfo.getLastPrice()));
 		double usdtAmount = CoinUtil.getPositionAmount(usdtPositionInfo);
 		double usdcAmount = positionInfo != null ? CoinUtil.getPositionAmount(positionInfo) : 0;
 
 		logPositionDetails(coin, usdtAmount, usdcAmount);
 
-// Handle profitable USDC position
+		// Handle profitable USDC position
 		if (usdcAmount > 0
 				&& handleProfitableUsdcPosition(coin, positionInfo, usdcAmount, openOrders, usdtPositionInfo)) {
 			return;
-		}
-
-// Ensure positions are not already stable
-		if (isPositionStable(positionInfo, usdtPositionInfo)) {
+		} else if (downMovement > Coins.INITIAL_SELL_ORDER_THRESHOLD && usdtPositionInfo.getUnRealizedProfit() > 0) {
+			closeHighlyProfitablePosition(usdtPositionInfo, positionInfo);
 			return;
 		}
 
-// Calculate adjusted quantity based on downMovement
+		// Ensure positions are not already stable
+//		if (isPositionStable(positionInfo, usdtPositionInfo)) {
+//			return;
+//		}
+
+		// Calculate adjusted quantity based on downMovement
 		double quantity = calculateAdjustedQuantity(positionInfo, usdtPositionInfo);
 
 		if (shouldCreateSellOrder(quantity, usdcAmount, usdtAmount)) {
@@ -751,8 +743,8 @@ public class PMStrategyExecutor {
 	}
 
 	private boolean shouldCreateSellOrder(double quantity, double usdcAmount, double usdtAmount) {
-		return quantity > 0 && downMovement > 6 && usdcAmount < usdtAmount
-				&& Double.valueOf(balanceInfo.getTotalAvailableBalance()) > usdtAmount;
+		return quantity > 0 && downMovement > Coins.INITIAL_SELL_ORDER_THRESHOLD
+				&& Double.valueOf(balanceInfo.getAvailableBalance()) > usdtAmount;
 	}
 
 	private void createSellOrder(String coin, TickerInfo tickerInfo, double quantity, double usdtAmount,
@@ -773,16 +765,20 @@ public class PMStrategyExecutor {
 			List<OpenOrderInfo> openOrders, PositionInfo usdtPositionInfo) {
 		double profitInPercentage = PositionCalculator.calculatePercentageProfit(positionInfo.getUnRealizedProfit(),
 				usdcAmount);
-		boolean hasSufficientBalance = Double.valueOf(balanceInfo.getTotalAvailableBalance()) >= usdcAmount * 22 * 2 * 10;
-		boolean isMarketFavorable = upMovement > downMovement * 6;
+		if (profitInPercentage < 0)
+			return false;
+		boolean hasSufficientBalance = Double.valueOf(balanceInfo.getAvailableBalance()) >= usdcAmount
+				* Coins.MULTIPLIER_LEVERAGE;
+		boolean isMarketFavorable = upMovement > downMovement * 4;
 
-		if (profitInPercentage > 100.0 && hasSufficientBalance) {
-			// positionManager.deleteFuturesOpenOrder(coin);
-			// positionManager.closeFuturePosition(coin, positionInfo);
-			return true;
-		} else if (profitInPercentage > 50.0 && hasSufficientBalance && isMarketFavorable) {
+//		if (profitInPercentage > 0.0 && hasSufficientBalance && isMarketFavorable) {
+//			positionManager.deleteFuturesOpenOrder(coin);
+//			positionManager.closeFuturePosition(coin, positionInfo);
+//			return true;
+//		} else 
+		if (profitInPercentage > Coins.SELL_PROFIT_PERCENTAGE_CUTOFF) {
 			orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdtPositionInfo);
-			return true;
+			return false;
 		}
 		return false;
 	}
@@ -797,16 +793,33 @@ public class PMStrategyExecutor {
 		double usdcPositionAmount = positionInfo != null ? Math.abs(positionInfo.getPositionAmount()) : 0;
 
 		logPositionAmounts(usdtPositionAmount, usdcPositionAmount);
+		double profitInPercentage = positionInfo != null
+				? PositionCalculator.calculatePercentageProfit(positionInfo.getUnRealizedProfit(),
+						CoinUtil.getPositionAmount(positionInfo))
+				: 0;
 
-		if (isDownMovementInRange(12, 18)) {
-			return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 4);
-		} else if (isDownMovementInRange(18, 22)) {
-			return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 2);
-		} else if (downMovement > 22) {
-			return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo);
+		if (isDownMovementInRange(Coins.INITIAL_SELL_ORDER_THRESHOLD, Coins.INITIAL_SELL_ORDER_THRESHOLD + 6)) {
+			return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo, false);
+		} else if (isDownMovementInRange(Coins.INITIAL_SELL_ORDER_THRESHOLD + 6,
+				Coins.INITIAL_SELL_ORDER_THRESHOLD + 12)) {
+			if (profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 2 || positionInfo == null)
+				return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo, true);
+//			else if(profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF)
+//				return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 3);
+		} else if (isDownMovementInRange(Coins.INITIAL_SELL_ORDER_THRESHOLD + 12,
+				Coins.INITIAL_SELL_ORDER_THRESHOLD + 18)) {
+			if (profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 3 || positionInfo == null)
+				return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo,true);
+//			else if(profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 2)
+//				return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 2);		
+		} else if (downMovement > Coins.INITIAL_SELL_ORDER_THRESHOLD + 18) {
+			if (profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 4 || positionInfo == null)
+				return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo,true);
+//			else if(profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF *2)
+//				return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 2);	
 		}
 
-		return 0;
+		return 0; // Default to base quantity
 	}
 
 	private void logPositionAmounts(double usdtPositionAmount, double usdcPositionAmount) {
@@ -830,10 +843,15 @@ public class PMStrategyExecutor {
 				: usdtPositionInfo.getPositionAmount() / divisor;
 	}
 
-	private double calculateQuantityForHighDownMovement(PositionInfo positionInfo, PositionInfo usdtPositionInfo) {
-		return positionInfo != null
-				? Math.max(usdtPositionInfo.getPositionAmount() - Math.abs(positionInfo.getPositionAmount()), 0)
-				: usdtPositionInfo.getPositionAmount();
+	private double calculateQuantityForHighDownMovement(PositionInfo positionInfo, PositionInfo usdtPositionInfo,
+			boolean flag) {
+		if (flag)
+			return positionInfo != null
+					? Math.max(usdtPositionInfo.getPositionAmount() - Math.abs(positionInfo.getPositionAmount()), 0)
+					: usdtPositionInfo.getPositionAmount();
+		else
+			return usdtPositionInfo.getPositionAmount();
+
 	}
 
 	private Map<String, Object> createOrderParams(String coin, String side, TickerInfo tickerInfo) {
@@ -853,8 +871,8 @@ public class PMStrategyExecutor {
 		System.out.println(TOTAL_TIME_MESSAGE + (finishedTime.getTime() - startTime.getTime()) / (60.0 * 1000.0)
 				+ " minutes" + " \nProcessed Coins : " + processed);
 		System.out.println("Errors: " + errors + "\nCoins that didn't get processed: " + errored);
-		balanceInfo = walletManager.getAccountInfo();
-		System.out.printf("BalanceInfo: %s, UpMovement: %d, DownMovement: %d%n", balanceInfo.getTotalAvailableBalance(),
+		balanceInfo = walletManager.getFutureWalletBalance("USDT");
+		System.out.printf("BalanceInfo: %s, UpMovement: %d, DownMovement: %d%n", balanceInfo.getAvailableBalance(),
 				upMovement, downMovement);
 		double totalBuyAmount = buyPositions.stream().mapToDouble(CoinUtil::getPositionAmount).sum();
 		double totalSellAmount = sellPositions.stream().mapToDouble(CoinUtil::getPositionAmount).sum();

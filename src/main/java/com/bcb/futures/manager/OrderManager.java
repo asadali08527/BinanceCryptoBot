@@ -28,9 +28,11 @@ public class OrderManager extends ExceptionManager {
 	public void createFutureOpenOrder(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList,
 			PositionInfo oppositePositionInfo) throws BinanceConnectorException, BinanceClientException {
 		Map<String, Object> parameters = new HashMap<>();
-		double quantity = calculateOrderQuantity(coin, positionInfo, openOrderInfoList, oppositePositionInfo);
+		List<OpenOrderInfo> openOrders = openOrderInfoList.stream()
+				.filter(order -> order.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
+		double quantity = calculateOrderQuantity(coin, positionInfo, openOrders, oppositePositionInfo);
 
-		if (quantity < 0.1) {
+		if (quantity <= 0.1) {
 			System.out.printf("Skipping open order creation for coin: %s due to insufficient quantity (%.2f).%n", coin,
 					quantity);
 			return;
@@ -39,11 +41,26 @@ public class OrderManager extends ExceptionManager {
 		// Prepare order parameters
 		parameters.put("quantity", String.format("%.2f", quantity));
 		parameters.put("symbol", coin);
-		parameters.put("side", CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo)));
+		String side = CoinUtil.reverseSide(CoinUtil.evaluateSide(positionInfo));
+		parameters.put("side", side);
 		parameters.put("type", "STOP_MARKET");
-		double stopPrice = CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true);
-		parameters.put("stopPrice",
-				Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(stopPrice))));
+		double stopPrice = CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), false);
+		if (Coins.SELL_SIDE.equals(side)) {
+			if (!openOrders.isEmpty()) {
+				OpenOrderInfo openOrderInfo = openOrders.get(0);
+				stopPrice = stopPrice + ((stopPrice - Double.valueOf(openOrderInfo.getStopPrice())) / 5);
+			} else if (openOrders.isEmpty()) {
+				stopPrice = stopPrice + (stopPrice / 200);
+			}
+		} else if (Coins.BUY_SIDE.equals(side)) {
+			if (!openOrders.isEmpty()) {
+				OpenOrderInfo openOrderInfo = openOrders.get(0);
+				stopPrice = stopPrice - ((stopPrice - Double.valueOf(openOrderInfo.getStopPrice())) / 4);
+			} else if (openOrders.isEmpty()) {
+				stopPrice = stopPrice - (stopPrice / 200);
+			}
+		}
+		parameters.put("stopPrice", Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(stopPrice))));
 		// String.format("%.3f",
 		// CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), true)));
 		parameters.put("timeInForce", Coins.TIME_IN_FORCE);
@@ -56,10 +73,8 @@ public class OrderManager extends ExceptionManager {
 		System.out.printf("Open Limit Order Result for coin %s: %s%n", coin, result);
 	}
 
-	private double calculateOrderQuantity(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList,
+	private double calculateOrderQuantity(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrders,
 			PositionInfo oppositePositionInfo) {
-		List<OpenOrderInfo> openOrders = openOrderInfoList.stream()
-				.filter(order -> order.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
 
 		double quantity = 0;
 
@@ -77,21 +92,21 @@ public class OrderManager extends ExceptionManager {
 			// Adjust quantity for coins with "T" suffix
 			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
 				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
-				if (quantity > oppositePositionAmount) {
+				if (quantity >= oppositePositionAmount) {
 //					if (quantity <= oppositePositionAmount) {
 //						return 0; // Skip order creation
 //					}
-					quantity = quantity-oppositePositionAmount;
+					quantity = quantity - oppositePositionAmount;
 				}
 			}
 		} else {
-			 quantity = Math.abs(positionInfo.getPositionAmount());
+			quantity = Math.abs(positionInfo.getPositionAmount());
 
 			// Adjust quantity for coins with "T" suffix
 			if (positionInfo.getSymbol().endsWith("T") && oppositePositionInfo != null) {
 				double oppositePositionAmount = Math.abs(oppositePositionInfo.getPositionAmount());
-				if (quantity > oppositePositionAmount) {
-					quantity = quantity-oppositePositionAmount;
+				if (quantity >= oppositePositionAmount) {
+					quantity = quantity - oppositePositionAmount;
 				}
 			}
 		}
@@ -102,9 +117,9 @@ public class OrderManager extends ExceptionManager {
 	protected String retryAndLog(Map<String, Object> parameters, int retry, String logMessage) {
 		// Adjust parameters based on the retry count
 		if (retry % 2 == 0) {
-			double price = CoinUtil.addOrReduceOneBasisPoint(Double.valueOf(String.valueOf(parameters.get("stopPrice"))), true);
-			double stopPrice = Double.parseDouble(String.valueOf(
-					PrecisionAdjuster.adjustPrecision(price)));
+			double price = CoinUtil
+					.addOrReduceOneBasisPoint(Double.valueOf(String.valueOf(parameters.get("stopPrice"))), true);
+			double stopPrice = Double.parseDouble(String.valueOf(PrecisionAdjuster.adjustPrecision(price)));
 			parameters.put("stopPrice", stopPrice);
 		} else {
 			parameters.put("quantity", String.valueOf(Double.parseDouble((String) parameters.get("quantity"))));
@@ -142,20 +157,35 @@ public class OrderManager extends ExceptionManager {
 		}
 		return null;
 	}
+
 	protected String doubleQuantityAndRetry(Map<String, Object> parameters, int retry, String logMessage) {
 		retry += 1;
 		double quantity = Double.valueOf(String.valueOf(parameters.get("quantity")));
-		quantity+=1;
+		quantity += 1;
 		parameters.put("quantity", CoinUtil.adjustPrecision(String.valueOf(quantity)));
 		parameters.remove("timestamp");
 		parameters.remove("signature");
 		System.out.println(logMessage + parameters);
 		return createOrder(parameters, retry + 1);
 	}
+
 	public List<OpenOrderInfo> getOpenOrder(String coin, List<OpenOrderInfo> openOrders) {
 		List<OpenOrderInfo> openOrderInfoList = openOrders.stream().filter(f -> f.getSymbol().equalsIgnoreCase(coin))
 				.collect(Collectors.toList());
 		return openOrderInfoList;
 	}
-
+	/**
+	 * HANDLE 
+	 * Creating Open Limit Order for : {closePosition=false, symbol=DOGEUSDC,
+	 * side=BUY, stopPrice=0.391781, quantity=62.0, reduceOnly=true,
+	 * newOrderRespType=ACK, type=STOP_MARKET, timeInForce=GTC} fullErrMessage:
+	 * {"code":-2021,"msg":"Order would immediately trigger."} errMessage: Order
+	 * would immediately trigger. errCode: -2021 HTTPStatusCode: 400
+	 * {"code":-2021,"msg":"Order would immediately trigger."}{closePosition=false,
+	 * symbol=DOGEUSDC, side=BUY, stopPrice=0.391781, quantity=62.0,
+	 * reduceOnly=true,
+	 * signature=8008fe45a6411b741bd5c26566127921a273606f163779d10f9fc5ba5b3eadd7,
+	 * newOrderRespType=ACK, type=STOP_MARKET, timeInForce=GTC,
+	 * timestamp=1737196736466}
+	 */
 }
