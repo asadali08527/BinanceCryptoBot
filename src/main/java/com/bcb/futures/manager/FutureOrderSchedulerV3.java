@@ -99,7 +99,7 @@ public class FutureOrderSchedulerV3 {
                              List<OpenOrderInfo> openOrders, int upMovement, int downMovement) {
         if (Arrays.asList(Coins.SKIP_USDT_LIST).contains(coin)) return;
 
-        Map<String, Object> params = initializeParams(coin, tickerMap, upMovement, downMovement);
+        Map<String, Object> params = initializeParams(coin, tickerMap, upMovement, downMovement, openPositions);
 
         boolean openOrderExist = CoinUtil.openOrderExist(coin, openOrders);
         List<PositionInfo> positionInfoList = CoinUtil.getOpenPosition(coin, openPositions);
@@ -112,7 +112,7 @@ public class FutureOrderSchedulerV3 {
         }
     }
 
-    private Map<String, Object> initializeParams(String coin, Map<String, TickerInfo> tickerMap, int upMovement, int downMovement) {
+    private Map<String, Object> initializeParams(String coin, Map<String, TickerInfo> tickerMap, int upMovement, int downMovement,List<PositionInfo> openPositions) {
         Map<String, Object> params = new HashMap<>();
         params.put("type", MarketType.MARKET.toString());
         params.put("symbol", coin);

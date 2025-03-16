@@ -32,7 +32,7 @@ public class OrderManager extends ExceptionManager {
 				.filter(order -> order.getSymbol().equalsIgnoreCase(coin)).collect(Collectors.toList());
 		double quantity = calculateOrderQuantity(coin, positionInfo, openOrders, oppositePositionInfo);
 
-		if (quantity <= 0) {
+		if (quantity <= 0.1) {
 			System.out.printf("Skipping open order creation for coin: %s due to insufficient quantity (%.2f).%n", coin,
 					quantity);
 			return;
@@ -86,6 +86,7 @@ public class OrderManager extends ExceptionManager {
 		String result = createOrder(parameters, 0);
 		System.out.printf("Open Limit Order Result for coin %s: %s%n", coin, result);
 	}
+
 
 	public double calculateOrderQuantity(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrders,
 			PositionInfo oppositePositionInfo) {

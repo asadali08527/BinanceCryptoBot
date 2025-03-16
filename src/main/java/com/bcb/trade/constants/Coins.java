@@ -16,11 +16,19 @@ public class Coins {
 	public static final Double PRICE_CHANGE_PERCENTAGE_THRESHOLD_10 = 10.0;
 	public static final Double PRICE_CHANGE_PERCENTAGE_THRESHOLD_15 = 15.0;
 	
+<<<<<<< HEAD
 	public static final double MULTIPLIER_LEVERAGE = 60 * 56 * 2  ;
 	public static final double MAX_BUY_USDT_AMOUNT = 5;
 	public static final int MAX_BUY_ORDER = 14;
 	public static final int BUY_ORDER_IN_PROFIT_COUNT = MAX_BUY_ORDER/2;
 	public static final int INITIAL_SELL_ORDER_THRESHOLD = 7;
+=======
+	public static final double MULTIPLIER_LEVERAGE = 60  ;
+	public static final double MAX_BUY_USDT_AMOUNT = 2;
+	public static final int MAX_BUY_ORDER = 12;
+	public static final int BUY_ORDER_IN_PROFIT_COUNT = MAX_BUY_ORDER/2;
+	public static final int INITIAL_SELL_ORDER_THRESHOLD = 6;
+>>>>>>> 06f1cbf6bfa9e2696fbee89891cd36f4bb39ff58
 	public static final double SELL_PROFIT_PERCENTAGE_CUTOFF = 100;
 
 	public static final String ERROR_CODE_1111 = "-1111";
