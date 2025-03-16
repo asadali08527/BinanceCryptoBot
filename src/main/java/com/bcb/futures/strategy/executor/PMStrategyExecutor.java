@@ -798,11 +798,11 @@ public class PMStrategyExecutor {
 
 		logPositionAmounts(usdtPositionAmount, usdcPositionAmount);
 
-		if (isDownMovementInRange(22, 28)) {
+		if (isDownMovementInRange(12, 18)) {
 			return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 4);
-		} else if (isDownMovementInRange(28, 34)) {
+		} else if (isDownMovementInRange(18, 22)) {
 			return calculateQuantityForRange(usdtPositionInfo, positionInfo, usdcPositionAmount, 2);
-		} else if (downMovement > 34) {
+		} else if (downMovement > 22) {
 			return calculateQuantityForHighDownMovement(positionInfo, usdtPositionInfo);
 		}
 

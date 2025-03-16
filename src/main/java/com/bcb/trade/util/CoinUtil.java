@@ -33,7 +33,7 @@ public class CoinUtil {
 	}
 
 	public static String getQuantity(String coin, Double lastPrice) {
-		double result = Coins.BASE_LEVERAGE_100 / lastPrice;
+		double result = Coins.BASE_LEVERAGE_50 / lastPrice;
 		if(Arrays.asList(Coins.FUTURE_SYMBOLS_WITH_PREFIX_1000_COIN_NAME).contains(coin))
 			result = result/1000;
 		DecimalFormat decimalFormat = null;

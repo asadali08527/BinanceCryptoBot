@@ -183,15 +183,15 @@ public class MarketSentimentAnalyzer {
 				e.printStackTrace();
 				if (e.getErrorCode() == -1121) {
 					System.out.println(e.getMessage() + " for Parameters : " + parameters);
-					TickerInfo[] tickerInfoArray = new TickerInfo[symbols.size()];
+					List<TickerInfo> tickerInfos = new ArrayList<TickerInfo>(symbols.size());
 					for (int i = 0; i < symbols.size(); i++) {
 						TickerInfo tickerInfo = getTicker(symbols.get(i));
 						if (tickerInfo != null) {
-							tickerInfoArray[i] = tickerInfo;
+							tickerInfos.add(tickerInfo);
 						}
 					}
 					// Convert TickerInfo array to Map and add to the existing map
-					Map<String, TickerInfo> batchMap = Arrays.stream(tickerInfoArray)
+					Map<String, TickerInfo> batchMap = tickerInfos.stream()
 							.collect(Collectors.toMap(TickerInfo::getSymbol, tickerInfo -> tickerInfo));
 
 					tickerInfoMap.putAll(batchMap);

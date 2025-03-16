@@ -8,12 +8,12 @@ import java.util.concurrent.TimeUnit;
 import com.bcb.client.SpotClient;
 import com.bcb.config.AccountConfig;
 import com.bcb.config.PrivateConfig;
-import com.bcb.futures.strategy.executor.StrategyExecutor;
+import com.bcb.futures.strategy.executor.StrategyExecutorV2;
 import com.bcb.impl.SpotClientImpl;
 import com.bcb.transfer.BalanceInfo;
 import com.bcb.transfer.PositionInfo;
 
-public class FutureOrderSchedulerOptimized {
+public class FutureOrderSchedulerOptimizedV2 {
 	private static final int EXECUTION_INTERVAL_SECONDS = 10;
 
 	List<PositionInfo> openPositions = null;
@@ -26,7 +26,7 @@ public class FutureOrderSchedulerOptimized {
 	Integer downMovement = 0;
 	private List<AccountConfig> accountConfigs = null;
 
-	public FutureOrderSchedulerOptimized(List<AccountConfig> accountConfigs) {
+	public FutureOrderSchedulerOptimizedV2(List<AccountConfig> accountConfigs) {
 		this.accountConfigs = accountConfigs;
 	}
 
@@ -37,7 +37,7 @@ public class FutureOrderSchedulerOptimized {
 				new AccountConfig(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY, PrivateConfig.BASE_URLS[0])
 				);
 
-		FutureOrderSchedulerOptimized scheduler = new FutureOrderSchedulerOptimized(accountConfigs);
+		FutureOrderSchedulerOptimizedV2 scheduler = new FutureOrderSchedulerOptimizedV2(accountConfigs);
 		ScheduledExecutorService executor = Executors.newScheduledThreadPool(accountConfigs.size());
 		executor.scheduleAtFixedRate(scheduler::executeOppositeStrategyForAllAccounts, 0, EXECUTION_INTERVAL_SECONDS,
 				TimeUnit.SECONDS);
@@ -58,7 +58,7 @@ public class FutureOrderSchedulerOptimized {
 		OrderManager orderManager = new OrderManager(client);
 
 		// Use these managers to execute the strategy for this account
-		StrategyExecutor strategyExecutor = new StrategyExecutor(positionManager, futureOrderManager, walletManager,
+		StrategyExecutorV2 strategyExecutor = new StrategyExecutorV2(positionManager, futureOrderManager, walletManager,
 				orderManager);
 		strategyExecutor.executeStrategy();
 	}
