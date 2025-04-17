@@ -1,5 +1,7 @@
 package com.bcb.futures.strategy.executor;
 
+import com.bcb.futures.manager.FutureOrderManager;
+import com.bcb.futures.manager.PositionManager;
 import com.bcb.service.MarketService;
 import com.bcb.service.OrderService;
 import com.bcb.service.PositionService;
@@ -258,7 +260,8 @@ public class StrategyExecutorV3 {
 		handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount);
 
 		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)) {
-			stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo, usdcPositionAmount, usdtPositionAmount);
+			positionInfo = stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo, usdcPositionAmount, usdtPositionAmount);
+			handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount);
 			return;
 		}
 
@@ -297,14 +300,14 @@ public class StrategyExecutorV3 {
 	}
 
 	private boolean isHighProfit(double profitPercentage) {
-		return profitPercentage >= 550;
+		return profitPercentage >= 400;
 	}
 
 	private boolean isBetweenModerateAndHighProfit(double profitPercentage) {
 		return profitPercentage > 0 && profitPercentage < 150;
 	}
 
-	private void stabilizeBuyPosition(PositionInfo positionInfo, TickerInfo tickerInfo, PositionInfo usdcPositionInfo,
+	private PositionInfo stabilizeBuyPosition(PositionInfo positionInfo, TickerInfo tickerInfo, PositionInfo usdcPositionInfo,
 			double usdcPositionAmount, double usdtPositionAmount) {
 		double availableBalance = Double.valueOf(balanceInfo.getAvailableBalance());
 		double quantity = calculateStabilizationQuantity(usdcPositionAmount, usdtPositionAmount);
@@ -312,12 +315,16 @@ public class StrategyExecutorV3 {
 
 		if (quantity <= 0.0 || availableBalance < usdtAmount) {
 			System.out.println("No stabilization needed as quantity is zero or negative.");
-			return;
+			return positionInfo;
 		}
 
 		Map<String, Object> params = prepareBuyOrderParams(positionInfo.getSymbol(), tickerInfo, quantity);
 
 		executeBuyOrder(params);
+		
+		List<PositionInfo> positionInfos = positionService.getOpenPosition(positionInfo.getSymbol());
+		return positionInfos!=null? positionInfos.get(0):positionInfo;
+		
 	}
 
 	private double calculateStabilizationQuantity(double usdcPositionAmount, double usdtPositionAmount) {
@@ -327,7 +334,7 @@ public class StrategyExecutorV3 {
 
 	private Map<String, Object> prepareBuyOrderParams(String symbol, TickerInfo tickerInfo, double quantity) {
 		Map<String, Object> params = createOrderParams(symbol, "BUY", tickerInfo);
-		params.put("quantity", String.format("%.2f", quantity));
+		params.put("quantity", String.format("%.2f", quantity/2));
 		return params;
 	}
 
@@ -345,12 +352,12 @@ public class StrategyExecutorV3 {
 		try {
 			positionService.closePosition(positionInfo.getSymbol(), positionInfo);
 
-			if (usdcPositionInfo != null) {
-				double adjustedQuantity = calculateAdjustedQuantityForBuy(positionInfo, usdcPositionInfo);
-				closePositionWithAdjustedQuantity(positionInfo, adjustedQuantity);
-			} else {
-				closePositionDirectly(positionInfo);
-			}
+			//if (usdcPositionInfo != null) {
+//				double adjustedQuantity = calculateAdjustedQuantityForBuy(positionInfo, usdcPositionInfo);
+//				closePositionWithAdjustedQuantity(positionInfo, adjustedQuantity);
+//			} else {
+//				closePositionDirectly(positionInfo);
+//			}
 
 			System.out.println("Closed highly profitable position for symbol: " + positionInfo.getSymbol());
 		} catch (Exception e) {
@@ -629,12 +636,12 @@ public class StrategyExecutorV3 {
 				? PositionCalculator.calculatePercentageProfit(positionInfo.getUnRealizedProfit(),
 						CoinUtil.getPositionAmount(positionInfo))
 				: 0;
-		double quantity = calculateAdjustedQuantity(coin, positionInfo, usdtPositionInfo, openOrders);
+		double quantity = calculateAdjustedQuantity(coin, positionInfo, usdtPositionInfo, openOrders,  usdcAmount, usdtAmount);
 
 		if (shouldCreateSellOrder(quantity, usdcAmount, usdtAmount)) {
 			createSellOrder(coin, tickerInfo, quantity, usdtAmount, usdcAmount);
 		}
-		if (profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 3 || (profitInPercentage >= 0 && downMovement <= Coins.INITIAL_SELL_ORDER_THRESHOLD )) {
+		if (profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 10 || (positionInfo != null && profitInPercentage >= 0 && downMovement <= Coins.INITIAL_SELL_ORDER_THRESHOLD )) {
 			positionService.closePosition(coin, positionInfo);
 		}
 	}
@@ -653,7 +660,7 @@ public class StrategyExecutorV3 {
 		Map<String, Object> params = createOrderParams(coin, "SELL", tickerInfo);
 		params.put("quantity", String.format("%.2f", quantity));
 
-		if (usdcAmount < usdtAmount * 3) {
+		if (usdcAmount <= usdtAmount) {
 			orderService.createFuturePosition(params, 0);
 			System.out.println("Adjusted Sell order for params: " + params);
 		} else {
@@ -683,7 +690,7 @@ public class StrategyExecutorV3 {
 	}
 
 	private double calculateAdjustedQuantity(String coin, PositionInfo positionInfo, PositionInfo usdtPositionInfo,
-			List<OpenOrderInfo> openOrders) {
+			List<OpenOrderInfo> openOrders, double usdcAmount, double usdtAmount) {
 		double usdtPositionAmount = Math.abs(usdtPositionInfo.getPositionAmount());
 		double usdcPositionAmount = (positionInfo != null) ? Math.abs(positionInfo.getPositionAmount()) : 0;
 
@@ -691,8 +698,12 @@ public class StrategyExecutorV3 {
 
 		double profitInPercentage = calculateProfitPercentage(positionInfo);
 
-		if (shouldCreateUsdcPosition(positionInfo, coin, openOrders, usdtPositionInfo, profitInPercentage)) {
-			return usdtPositionInfo.getPositionAmount();
+		if (shouldCreateUsdcPosition(positionInfo, coin, openOrders, usdtPositionInfo, profitInPercentage, usdcAmount, usdtAmount)) {
+			if(usdtPositionAmount>usdcPositionAmount)
+				return (usdtPositionAmount-usdcPositionAmount);
+			else if((profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF 
+						&& orderService.calculateOrderQuantity(coin, positionInfo, orderService.filterOpenOrders(positionInfo.getSymbol(),openOrders), usdtPositionInfo) <= 0))
+				return usdtPositionInfo.getPositionAmount()/4;
 		}
 
 		return 0;
@@ -706,11 +717,10 @@ public class StrategyExecutorV3 {
 	}
 
 	private boolean shouldCreateUsdcPosition(PositionInfo positionInfo, String coin, List<OpenOrderInfo> openOrders,
-			PositionInfo usdtPositionInfo, double profitInPercentage) {
+			PositionInfo usdtPositionInfo, double profitInPercentage, double usdcAmount, double usdtAmount) {
 
 		return (downMovement > Coins.INITIAL_SELL_ORDER_THRESHOLD)
-				&& (positionInfo == null || (profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF * 2
-						&& orderService.calculateOrderQuantity(coin, positionInfo, orderService.filterOpenOrders(positionInfo.getSymbol(),openOrders), usdtPositionInfo) <= 0));
+				&& (positionInfo == null ||(usdtAmount>usdcAmount));
 	}
 
 	private void logPositionAmounts(double usdtPositionAmount, double usdcPositionAmount) {

@@ -88,9 +88,9 @@ public class OrderManager extends ExceptionManager {
 	private double modifyStopPrice(double stopPrice, List<OpenOrderInfo> openOrders, int direction) {
 		if (!openOrders.isEmpty()) {
 			double averageStopPrice = getAverageStopPrice(openOrders);
-			return stopPrice + direction * (Math.abs(stopPrice - averageStopPrice)/2 );
+			return stopPrice + direction * (Math.abs(stopPrice - averageStopPrice));
 		} else {
-			return stopPrice + direction * (stopPrice / 200);
+			return stopPrice + direction * (stopPrice / 190);
 		}
 	}
 

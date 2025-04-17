@@ -17,6 +17,10 @@ public class PositionService {
     public List<PositionInfo> getAllOpenPositions() {
         return positionManager.getAllOpenPositions();
     }
+    
+    public List<PositionInfo> getOpenPosition(String coin) {
+        return positionManager.getOpenPosition(coin);
+    }
 
     public List<PositionInfo> filterPositions(List<PositionInfo> positions, String side) {
     	return CoinUtil.getOpenPositions(CoinUtil.openPosition(positions), side);
