@@ -26,7 +26,7 @@ public class OrderManager extends ExceptionManager {
 	}
 
 	public void createFutureOpenOrder(String coin, PositionInfo positionInfo, List<OpenOrderInfo> openOrderInfoList,
-			PositionInfo oppositePositionInfo) throws BinanceConnectorException, BinanceClientException {
+			PositionInfo oppositePositionInfo, boolean onEntryPrice) throws BinanceConnectorException, BinanceClientException {
 		Map<String, Object> parameters = new HashMap<>();
 		List<OpenOrderInfo> openOrders = filterOpenOrders(coin, openOrderInfoList);
 		double quantity = calculateOrderQuantity(coin, positionInfo, openOrders, oppositePositionInfo);
@@ -43,7 +43,8 @@ public class OrderManager extends ExceptionManager {
 		parameters.put("type", "STOP_MARKET");
 
 		double stopPrice = CoinUtil.addOrReduceOneBasisPoint(positionInfo.getEntryPrice(), false);
-		stopPrice = adjustStopPrice(side, openOrders, stopPrice);
+		if(!onEntryPrice)
+			stopPrice = adjustStopPrice(side, openOrders, stopPrice);
 
 		if (!openOrders.isEmpty()) {
 			quantity += calculateTotalOpenOrderQuantity(openOrders);
@@ -90,7 +91,7 @@ public class OrderManager extends ExceptionManager {
 			double averageStopPrice = getAverageStopPrice(openOrders);
 			return stopPrice + direction * (Math.abs(stopPrice - averageStopPrice));
 		} else {
-			return stopPrice + direction * (stopPrice / 190);
+			return stopPrice + direction * (stopPrice / 100);
 		}
 	}
 

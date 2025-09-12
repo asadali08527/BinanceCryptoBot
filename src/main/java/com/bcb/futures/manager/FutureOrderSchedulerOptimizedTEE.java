@@ -232,7 +232,7 @@ public class FutureOrderSchedulerOptimizedTEE {
 	}
 
 	private void processNewBuyOrder(PositionInfo positionInfo, TickerInfo tickerInfo, List<OpenOrderInfo> openOrders) {
-		orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, null);
+		orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, null,true);
 		createNewBuyPosition(positionInfo.getSymbol(), tickerInfo);
 		System.out.println("Processed new buy order for symbol: " + positionInfo.getSymbol());
 	}
@@ -275,7 +275,7 @@ public class FutureOrderSchedulerOptimizedTEE {
 		Map<String, Object> params = createOrderParams(positionInfo.getSymbol(), Coins.BUY_SIDE, tickerInfo);
 		params.put("quantity", String.format("%.2f", quantity));
 
-		orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo);
+		orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo,true);
 
 		if (buyPositionsInProfit.size() > 6 && Double.valueOf(balanceInfo
 				.getAvailableBalance()) >= ((quantity * tickerInfo.getLastPrice()) / positionInfo.getLeverage())) {
@@ -438,7 +438,7 @@ public class FutureOrderSchedulerOptimizedTEE {
 
 			if (profitInPercentage > 25.0 && hasSufficientBalance && isMarketFavorable) {
 				orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders,
-						usdtPositionInfo);
+						usdtPositionInfo,true);
 			}
 		}
 		// Determine quantity adjustments based on downMovement

@@ -310,7 +310,7 @@ public class StrategyExecutor {
 //		if (Arrays.asList(Coins.SKIP_USDT_LIST).contains(positionInfo.getSymbol()))
 //			return;
 		if (usdtAmount > 1.0) {// && (hasNoOpenOrders || shouldCreateOrder)
-			orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo);
+			orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo,true);
 		}
 	}
 
@@ -413,7 +413,7 @@ public class StrategyExecutor {
 	}
 
 	private void processNewBuyOrder(PositionInfo positionInfo, TickerInfo tickerInfo, List<OpenOrderInfo> openOrders) {
-		orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, null);
+		orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, null,true);
 		createNewBuyPosition(positionInfo.getSymbol(), tickerInfo);
 		System.out.println("Processed new buy order for symbol: " + positionInfo.getSymbol());
 	}
@@ -775,7 +775,7 @@ public class StrategyExecutor {
 			positionManager.closeFuturePosition(coin, positionInfo);
 			return true;
 		} else if (profitInPercentage > Coins.SELL_PROFIT_PERCENTAGE_CUTOFF) {
-			orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdtPositionInfo);
+			orderManager.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdtPositionInfo,true);
 			return true;
 		}
 		return false;

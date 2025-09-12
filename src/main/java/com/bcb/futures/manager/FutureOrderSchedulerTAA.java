@@ -366,7 +366,7 @@ public class FutureOrderSchedulerTAA {
 								params.put("quantity", String.valueOf(new DecimalFormat("#.##").format(quantity)));
 								if (Double.valueOf(balanceInfo.getAvailableBalance()) > 0)
 									orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList,
-											usdcPositionInfo);
+											usdcPositionInfo,true);
 								if (buyPositionsInProfit.size() > 6 && Double.valueOf(
 										balanceInfo.getAvailableBalance()) >= ((quantity * tickerInfo.getLastPrice())
 												/ positionInfo.getLeverage()))
@@ -376,7 +376,7 @@ public class FutureOrderSchedulerTAA {
 							} else {
 								if (Double.valueOf(balanceInfo.getAvailableBalance()) > 0) {
 									orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList,
-											usdcPositionInfo);
+											usdcPositionInfo,true);
 								}
 							}
 						}
@@ -406,7 +406,7 @@ public class FutureOrderSchedulerTAA {
 							&& (Double.valueOf(balanceInfo.getAvailableBalance()) != 0.0
 									&& Double.valueOf(balanceInfo.getAvailableBalance()) >= usdcAmount
 									&& upMovement > downMovement)) {
-						orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList, usdtPositionInfo);
+						orderManager.createFutureOpenOrder(coin, positionInfo, openOrderInfoList, usdtPositionInfo,true);
 					}
 				}
 				if (downMovement > 11 || tickerMap.get(coin).getPriceChangePercent() < 0) // ||

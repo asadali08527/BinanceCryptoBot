@@ -225,7 +225,7 @@ public class StrategyExecutorV3 {
 	}
 
 	private boolean isBelowMinimumUsdtAmount(double usdtAmount) {
-		return usdtAmount <= 1;
+		return usdtAmount <= Coins.MINIMUM_BUY_ORDER_BASE_AMOUNT;
 	}
 
 	private PositionInfo getUsdcPositionInfo(String usdcCoin) {
@@ -253,31 +253,39 @@ public class StrategyExecutorV3 {
 		double usdcPositionAmount = usdcPositionInfo != null ? Math.abs(usdcPositionInfo.getPositionAmount()) : 0;
 		double usdtPositionAmount = positionInfo.getPositionAmount();
 
+//		if (profitPercentage <= 25) {
+//			return;
+//		}
+		
+		
 		if (profitPercentage <= Coins.OPEN_ORDER_THRESHOLD_FOR_BUY) {
 			return;
 		}
-
-		handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount);
-
 		if (shouldStabilizePosition(usdcPositionAmount, usdtPositionAmount)) {
 			positionInfo = stabilizeBuyPosition(positionInfo, tickerInfo, usdcPositionInfo, usdcPositionAmount, usdtPositionAmount);
-			handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount);
 			return;
 		}
-
+		
+		handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount, true);
+		
 		handleProfitScenarios(positionInfo, tickerInfo, usdcPositionInfo, profitPercentage, usdcAmount, usdtAmount,
 				openOrders);
+//		if (profitPercentage <= Coins.OPEN_ORDER_THRESHOLD_FOR_BUY+(25*8)) {
+//			return;
+//		}
+//		handleFutureOpenOrder(positionInfo, tickerInfo, openOrders, usdcPositionInfo, profitPercentage, usdtAmount,false);
+
 	}
 
 	private void handleFutureOpenOrder(PositionInfo positionInfo, TickerInfo tickerInfo, List<OpenOrderInfo> openOrders,
-			PositionInfo usdcPositionInfo, double profitPercentage, double usdtAmount) {
+			PositionInfo usdcPositionInfo, double profitPercentage, double usdtAmount, boolean onEntryPrice) {
 		if (usdtAmount > 1.0) {
-			orderService.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo);
+			orderService.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdcPositionInfo, onEntryPrice);
 		}
 	}
 
 	private boolean shouldStabilizePosition(double usdcPositionAmount, double usdtPositionAmount) {
-		return usdcPositionAmount >= usdtPositionAmount;
+		return usdcPositionAmount>= usdtPositionAmount;
 	}
 
 	private void handleProfitScenarios(PositionInfo positionInfo, TickerInfo tickerInfo, PositionInfo usdcPositionInfo,
@@ -296,11 +304,11 @@ public class StrategyExecutorV3 {
 	}
 
 	private boolean isModerateProfit(double profitPercentage, double usdtAmount) {
-		return profitPercentage > Coins.BUY_NEW_CREATE_ORDER_THRESHOLD && profitPercentage < 550 && usdtAmount < Coins.MAX_BUY_USDT_AMOUNT;
+		return profitPercentage > Coins.BUY_NEW_CREATE_ORDER_THRESHOLD && profitPercentage < Coins.BUY_ORDER_PROFIT_BOOK_THRESHOLD && usdtAmount < Coins.MAX_BUY_USDT_AMOUNT;
 	}
 
 	private boolean isHighProfit(double profitPercentage) {
-		return profitPercentage >= 400;
+		return profitPercentage >= Coins.BUY_ORDER_PROFIT_BOOK_THRESHOLD + (Coins.BUY_ORDER_PROFIT_BOOK_THRESHOLD/2);
 	}
 
 	private boolean isBetweenModerateAndHighProfit(double profitPercentage) {
@@ -329,7 +337,7 @@ public class StrategyExecutorV3 {
 
 	private double calculateStabilizationQuantity(double usdcPositionAmount, double usdtPositionAmount) {
 		double quantityDifference = usdcPositionAmount - usdtPositionAmount;
-		return (quantityDifference > 0.0) ? quantityDifference : usdtPositionAmount;
+		return (quantityDifference >= 0.0) ? usdtPositionAmount/5 : usdtPositionAmount;
 	}
 
 	private Map<String, Object> prepareBuyOrderParams(String symbol, TickerInfo tickerInfo, double quantity) {
@@ -683,7 +691,7 @@ public class StrategyExecutorV3 {
 			positionService.closePosition(coin, positionInfo);
 			return true;
 		} else if (profitInPercentage > Coins.SELL_PROFIT_PERCENTAGE_CUTOFF) {
-			orderService.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdtPositionInfo);
+			orderService.createFutureOpenOrder(positionInfo.getSymbol(), positionInfo, openOrders, usdtPositionInfo,false);
 			return false;
 		}
 		return false;
@@ -701,9 +709,9 @@ public class StrategyExecutorV3 {
 		if (shouldCreateUsdcPosition(positionInfo, coin, openOrders, usdtPositionInfo, profitInPercentage, usdcAmount, usdtAmount)) {
 			if(usdtPositionAmount>usdcPositionAmount)
 				return (usdtPositionAmount-usdcPositionAmount);
-			else if((profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF 
+			else if((profitInPercentage >= Coins.SELL_PROFIT_PERCENTAGE_CUTOFF/2 
 						&& orderService.calculateOrderQuantity(coin, positionInfo, orderService.filterOpenOrders(positionInfo.getSymbol(),openOrders), usdtPositionInfo) <= 0))
-				return usdtPositionInfo.getPositionAmount()/4;
+				return usdtPositionInfo.getPositionAmount()/2;
 		}
 
 		return 0;

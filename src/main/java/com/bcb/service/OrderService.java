@@ -25,8 +25,8 @@ public class OrderService {
         futureOrderManager.createFuturePosition(params, leverage);
     }
 
-    public void createFutureOpenOrder(String symbol, PositionInfo positionInfo, List<OpenOrderInfo> openOrders, PositionInfo oppositePositionInfo) {
-        orderManager.createFutureOpenOrder(symbol, positionInfo, openOrders, oppositePositionInfo);
+    public void createFutureOpenOrder(String symbol, PositionInfo positionInfo, List<OpenOrderInfo> openOrders, PositionInfo oppositePositionInfo, boolean onEntryPrice) {
+        orderManager.createFutureOpenOrder(symbol, positionInfo, openOrders, oppositePositionInfo,onEntryPrice);
     }
 
     public double calculateOrderQuantity(String symbol, PositionInfo positionInfo, List<OpenOrderInfo> openOrders, PositionInfo oppositePositionInfo) {

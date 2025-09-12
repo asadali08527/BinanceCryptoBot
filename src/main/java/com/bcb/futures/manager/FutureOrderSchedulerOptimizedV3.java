@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import com.bcb.client.SpotClient;
 import com.bcb.config.AccountConfig;
 import com.bcb.config.PrivateConfig;
-import com.bcb.futures.strategy.executor.StrategyExecutorV2;
 import com.bcb.futures.strategy.executor.StrategyExecutorV3;
 import com.bcb.impl.SpotClientImpl;
 import com.bcb.service.MarketService;
@@ -19,10 +18,11 @@ import com.bcb.transfer.BalanceInfo;
 import com.bcb.transfer.PositionInfo;
 
 public class FutureOrderSchedulerOptimizedV3 {
-	private static final int EXECUTION_INTERVAL_SECONDS = 10;
+	private static final int EXECUTION_INTERVAL_SECONDS = 9;
 
 	List<PositionInfo> openPositions = null;
 	List<PositionInfo> buyPositions = null;
+	
 	List<PositionInfo> sellPositions = null;
 	BalanceInfo balanceInfo = null;
 
@@ -39,6 +39,7 @@ public class FutureOrderSchedulerOptimizedV3 {
 		// Define account configurations
 		List<AccountConfig> accountConfigs = List.of(
 				//new AccountConfig(PrivateConfig.TEE_API_KEY, PrivateConfig.TEE_SECRET_KEY, PrivateConfig.BASE_URLS[0])
+				//,
 				new AccountConfig(PrivateConfig.TAA_API_KEY, PrivateConfig.TAA_SECRET_KEY, PrivateConfig.BASE_URLS[0])
 				);
 

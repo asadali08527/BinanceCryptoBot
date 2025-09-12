@@ -16,15 +16,17 @@ public class Coins {
 	public static final Double PRICE_CHANGE_PERCENTAGE_THRESHOLD_10 = 10.0;
 	public static final Double PRICE_CHANGE_PERCENTAGE_THRESHOLD_15 = 15.0;
 	
-	public static final double MULTIPLIER_LEVERAGE = 60 * 56 * 2  ;
-	public static final double MAX_BUY_USDT_AMOUNT = 30;
-	public static final int MAX_BUY_ORDER = 14;
+	public static final double MULTIPLIER_LEVERAGE =  56 * 2  ;
+	public static final double MINIMUM_BUY_ORDER_BASE_AMOUNT = 1;
+	public static final double MAX_BUY_USDT_AMOUNT = 2*MINIMUM_BUY_ORDER_BASE_AMOUNT;
+	public static final int MAX_BUY_ORDER = 0;
 	public static final int BUY_ORDER_IN_PROFIT_COUNT = MAX_BUY_ORDER/2;
 	public static final double OPEN_ORDER_THRESHOLD_FOR_BUY = 75;
-	public static final double BUY_NEW_CREATE_ORDER_THRESHOLD = 100;
+	public static final double BUY_NEW_CREATE_ORDER_THRESHOLD = 75;
+	public static final double BUY_ORDER_PROFIT_BOOK_THRESHOLD = 250;
 	public static final double MINIMUM_OPEN_ORDER_QUANTITY = 0.01;
-	public static final double SELL_PROFIT_PERCENTAGE_CUTOFF = 100;
-	public static final int INITIAL_SELL_ORDER_THRESHOLD = 7;
+	public static final double SELL_PROFIT_PERCENTAGE_CUTOFF = 200;
+	public static final int INITIAL_SELL_ORDER_THRESHOLD = -1;
 
 	public static final String ERROR_CODE_1111 = "-1111";
 	public static final String ERROR_CODE_4164 = "-4164";
@@ -60,7 +62,7 @@ public class Coins {
 	public static final Double PROFIT_THRESHOLD = 1.0;
 	public static final String[] SKIP_USDC_LIST = { "XRPUSDC", "BTCUSDC", "ETHUSDC", "CRVUSDC" };
 	public static String[] SKIP_LIST = { "XRPUSDT", "XRPUSDC" };
-	public static String[] SKIP_USDT_LIST = { "XRPUSDT", "BTCUSDT", "ETHUSDT" };
+	public static String[] SKIP_USDT_LIST = { "XRPUSDT"};
 	public static String[] FUTURE_OPPOSITE_SYMBOLS = { "XRP", "SOL", "ETH", "BTC", "BNB", "ORDI", "DOGE" };
 	public static String[] FUTURE_SYMBOLS_WITH_PREFIX_1000_COIN_NAME = { "LUNCUSDT", "XECUSDT", "FLOKIUSDT", "PEPEUSDT",
 			"SHIBUSDT", "BONKUSDT", "PEPEUSDC" };
